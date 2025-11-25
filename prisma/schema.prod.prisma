@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Dream {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  type      String   @default("dream") // "dream" | "no_dream"
+  date      String   // YYYY-MM-DD
+  tags      String   @db.Text // JSON string of tags
+  analysis  String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+}
