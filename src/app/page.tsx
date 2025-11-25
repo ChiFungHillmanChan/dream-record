@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { 
-  Moon, Mic, Save, RotateCcw, Search, Trash2, Edit2, 
-  ChevronLeft, ChevronRight, Calendar as CalendarIcon,
-  Download, Upload, FileJson, Settings
+  Mic, RotateCcw, Search, Trash2, Edit2, 
+  ChevronLeft, ChevronRight,
+  Download, Upload, Settings
 } from 'lucide-react';
 import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult } from '@/app/actions';
 import type { Dream } from '@prisma/client';
@@ -91,7 +91,6 @@ const Chip = ({ label, active, onClick, onRemove }: { label: string, active?: bo
 export default function DreamJournal() {
   // Data State
   const [dreams, setDreams] = useState<Dream[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'record' | 'history'>('record');
@@ -109,7 +108,6 @@ export default function DreamJournal() {
   // History/Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'dream' | 'no_dream'>('all');
-  const [filterTags, setFilterTags] = useState<Set<string>>(new Set());
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(new Date().toISOString().split('T')[0]);
@@ -172,10 +170,8 @@ export default function DreamJournal() {
   };
 
   const loadDreams = async () => {
-    setLoading(true);
     const data = await getDreams();
     setDreams(data);
-    setLoading(false);
   };
 
   // Stats
@@ -190,11 +186,11 @@ export default function DreamJournal() {
     const uniqueDates = new Set(dreams.map(d => d.date));
     const today = new Date().toISOString().split('T')[0];
     let current = 0;
-    let d = new Date(today);
+    const dateIterator = new Date(today);
     
-    while (uniqueDates.has(d.toISOString().split('T')[0])) {
+    while (uniqueDates.has(dateIterator.toISOString().split('T')[0])) {
       current++;
-      d.setDate(d.getDate() - 1);
+      dateIterator.setDate(dateIterator.getDate() - 1);
     }
     return current;
   };
