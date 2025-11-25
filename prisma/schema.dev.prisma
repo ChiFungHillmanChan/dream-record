@@ -4,17 +4,20 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:./dev.db"
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  dreams    Dream[]
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+  role          String    @default("USER") // USER or SUPERADMIN
+  plan          String    @default("FREE") // FREE or DEEP
+  planExpiresAt DateTime? // When the paid plan expires (null for FREE plan)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  dreams        Dream[]
 }
 
 model Dream {

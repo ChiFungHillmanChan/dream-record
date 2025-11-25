@@ -7,6 +7,7 @@ export type SessionPayload = JoseJWTPayload & {
   userId: string;
   email: string;
   name?: string | null;
+  role: 'USER' | 'SUPERADMIN';
 };
 
 export async function signJWT(payload: SessionPayload) {

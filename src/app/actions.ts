@@ -6,6 +6,35 @@ import { revalidatePath } from 'next/cache';
 import { getOpenAI } from '@/app/services/openai';
 import { loadPromptFile } from '@/app/services/load-prompts';
 import { getSession } from '@/lib/auth';
+import { ROLES } from '@/lib/constants';
+
+// User info type for header display
+export type CurrentUserInfo = {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  plan: string;
+} | null;
+
+// Get current user info for header display
+export async function getCurrentUser(): Promise<CurrentUserInfo> {
+  const session = await getSession();
+  if (!session?.userId) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId as string },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      plan: true,
+    },
+  });
+
+  return user as CurrentUserInfo;
+}
 
 export type DreamData = {
   content: string;

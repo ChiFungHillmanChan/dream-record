@@ -37,7 +37,12 @@ export async function register(prevState: unknown, formData: FormData) {
       },
     });
 
-    await setSession({ userId: user.id, email: user.email, name: user.name });
+    await setSession({ 
+      userId: user.id, 
+      email: user.email, 
+      name: user.name,
+      role: user.role as 'USER' | 'SUPERADMIN'
+    });
     
   } catch (error) {
     console.error('Registration error:', error);
@@ -70,7 +75,12 @@ export async function login(prevState: unknown, formData: FormData) {
       return { error: 'Invalid email or password' };
     }
 
-    await setSession({ userId: user.id, email: user.email, name: user.name });
+    await setSession({ 
+      userId: user.id, 
+      email: user.email, 
+      name: user.name,
+      role: user.role as 'USER' | 'SUPERADMIN'
+    });
 
   } catch (error) {
     console.error('Login error:', error);
@@ -106,6 +116,58 @@ export async function deleteAccount(prevState: unknown, formData: FormData) {
   redirect('/login');
 }
 
+// Check if superadmin exists
+export async function checkSuperAdminExists(): Promise<boolean> {
+  const existingAdmin = await prisma.user.findFirst({
+    where: { role: 'SUPERADMIN' },
+  });
+  return !!existingAdmin;
+}
+
+// Initial superadmin setup - can only be used when no superadmin exists
+export async function setupSuperAdmin(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await getSession();
+    if (!session?.userId) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    // Check if any superadmin already exists
+    const existingAdmin = await prisma.user.findFirst({
+      where: { role: 'SUPERADMIN' },
+    });
+
+    if (existingAdmin) {
+      return { success: false, error: 'Superadmin already exists' };
+    }
+
+    // Make current user the superadmin
+    await prisma.user.update({
+      where: { id: session.userId as string },
+      data: { role: 'SUPERADMIN' },
+    });
+
+    // Update session
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: session.userId as string },
+    });
+
+    if (updatedUser) {
+      await setSession({
+        userId: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        role: updatedUser.role as 'USER' | 'SUPERADMIN',
+      });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Setup superadmin error:', error);
+    return { success: false, error: 'Failed to setup superadmin' };
+  }
+}
+
 export async function updateSettings(prevState: unknown, formData: FormData) {
   const session = await getSession();
   if (!session?.userId) {
@@ -133,7 +195,12 @@ export async function updateSettings(prevState: unknown, formData: FormData) {
       });
       
       // Update session with new details if needed
-      await setSession({ userId: updatedUser.id, email: updatedUser.email, name: updatedUser.name });
+      await setSession({ 
+        userId: updatedUser.id, 
+        email: updatedUser.email, 
+        name: updatedUser.name,
+        role: updatedUser.role as 'USER' | 'SUPERADMIN'
+      });
       revalidatePath('/settings');
       return { success: 'Settings updated successfully' };
     }

@@ -4,9 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Mic, RotateCcw, Search, Trash2, Edit2, 
   ChevronLeft, ChevronRight,
-  Download, Upload, Settings
+  Download, Upload, Settings, Shield, Crown
 } from 'lucide-react';
-import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult } from '@/app/actions';
+import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo } from '@/app/actions';
+import { ROLES, PLANS } from '@/lib/constants';
 import type { Dream } from '@prisma/client';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -91,6 +92,7 @@ const Chip = ({ label, active, onClick, onRemove }: { label: string, active?: bo
 export default function DreamJournal() {
   // Data State
   const [dreams, setDreams] = useState<Dream[]>([]);
+  const [currentUser, setCurrentUser] = useState<CurrentUserInfo>(null);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'record' | 'history'>('record');
@@ -120,8 +122,14 @@ export default function DreamJournal() {
   // Load Data & set today's date on client
   useEffect(() => {
     loadDreams();
+    loadCurrentUser();
     setTodayStr(new Date().toLocaleDateString());
   }, []);
+
+  const loadCurrentUser = async () => {
+    const user = await getCurrentUser();
+    setCurrentUser(user);
+  };
 
   // Speech Recognition Setup
   useEffect(() => {
@@ -373,6 +381,23 @@ export default function DreamJournal() {
                 </div>
                 {renderStreakGrid()}
             </div>
+            {/* Plan Badge */}
+            {currentUser?.plan === PLANS.DEEP && (
+              <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/20 border border-purple-500/30">
+                <Crown size={14} className="text-amber-400" />
+                <span className="text-xs text-purple-300 font-medium">深度版</span>
+              </div>
+            )}
+            {/* Admin Link */}
+            {currentUser?.role === ROLES.SUPERADMIN && (
+              <Link 
+                href="/admin" 
+                className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/30 hover:bg-amber-500/30 transition-colors text-amber-400"
+                title="管理控制台"
+              >
+                <Shield size={20} />
+              </Link>
+            )}
             <Link href="/settings" className="p-2 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] hover:bg-white/5 transition-colors text-[var(--muted)] hover:text-white">
                 <Settings size={20} />
             </Link>
