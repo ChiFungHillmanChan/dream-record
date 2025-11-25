@@ -2,7 +2,8 @@
 
 import { useState, useActionState, useEffect } from 'react';
 import { updateSettings, deleteAccount, logout, setupSuperAdmin } from '../actions/auth';
-import { createCheckoutSession, createCustomerPortalSession } from '../actions/stripe';
+import { createCustomerPortalSession } from '../actions/stripe';
+import { STRIPE_PAYMENT_LINKS } from '@/app/services/stripe';
 import { motion } from 'framer-motion';
 import { User, Mail, Lock, Save, Trash2, LogOut, Settings as SettingsIcon, ArrowLeft, Crown, Shield, Calendar, CreditCard, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
@@ -58,18 +59,20 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
     }
   }, [searchParams]);
   
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     setIsCheckingOut(true);
     setCheckoutError(null);
     
-    const result = await createCheckoutSession(billingPeriod);
+    // Direct redirect to Stripe Payment Link (no server action needed)
+    const paymentLink = billingPeriod === 'yearly'
+      ? STRIPE_PAYMENT_LINKS.DEEP_YEARLY
+      : STRIPE_PAYMENT_LINKS.DEEP_MONTHLY;
     
-    if (result.success && result.url) {
-      window.location.href = result.url;
-    } else {
-      setCheckoutError(result.error ?? 'Failed to start checkout');
-      setIsCheckingOut(false);
-    }
+    // Append email for pre-filling
+    const url = new URL(paymentLink);
+    url.searchParams.set('prefilled_email', user.email);
+    
+    window.location.href = url.toString();
   };
   
   const handleManageSubscription = async () => {
