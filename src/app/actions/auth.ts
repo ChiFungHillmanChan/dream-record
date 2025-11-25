@@ -1,0 +1,146 @@
+'use server';
+
+import { prisma } from '@/lib/prisma';
+import { hashPassword, verifyPassword, setSession, clearSession, getSession } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
+
+export async function register(prevState: unknown, formData: FormData) {
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+  const name = formData.get('name') as string;
+
+  if (!email || !password || !name) {
+    return { error: 'All fields are required' };
+  }
+
+  if (password.length < 6) {
+    return { error: 'Password must be at least 6 characters' };
+  }
+
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return { error: 'Email already registered' };
+    }
+
+    const hashedPassword = await hashPassword(password);
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name,
+      },
+    });
+
+    await setSession({ userId: user.id, email: user.email, name: user.name });
+    
+  } catch (error) {
+    console.error('Registration error:', error);
+    return { error: 'Something went wrong. Please try again.' };
+  }
+  
+  redirect('/');
+}
+
+export async function login(prevState: unknown, formData: FormData) {
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+
+  if (!email || !password) {
+    return { error: 'Email and password are required' };
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return { error: 'Invalid email or password' };
+    }
+
+    const isValid = await verifyPassword(password, user.password);
+
+    if (!isValid) {
+      return { error: 'Invalid email or password' };
+    }
+
+    await setSession({ userId: user.id, email: user.email, name: user.name });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    return { error: 'Something went wrong. Please try again.' };
+  }
+
+  redirect('/');
+}
+
+export async function logout() {
+  await clearSession();
+  redirect('/login');
+}
+
+export async function deleteAccount(prevState: unknown, formData: FormData) {
+  const session = await getSession();
+  if (!session?.userId) {
+    return { error: 'Not authenticated' };
+  }
+
+  try {
+    // Delete user (cascade deletes dreams due to schema)
+    await prisma.user.delete({
+      where: { id: session.userId as string },
+    });
+
+    await clearSession();
+  } catch (error) {
+    console.error('Delete account error:', error);
+    return { error: 'Failed to delete account' };
+  }
+
+  redirect('/login');
+}
+
+export async function updateSettings(prevState: unknown, formData: FormData) {
+  const session = await getSession();
+  if (!session?.userId) {
+    return { error: 'Not authenticated' };
+  }
+
+  const name = formData.get('name') as string;
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+
+  try {
+    const dataToUpdate: { name?: string; email?: string; password?: string } = {};
+    if (name) dataToUpdate.name = name;
+    if (email) dataToUpdate.email = email; // Note: changing email might require re-verification in a real app
+    if (password && password.length >= 6) {
+      dataToUpdate.password = await hashPassword(password);
+    } else if (password && password.length < 6) {
+        return { error: "Password must be at least 6 characters" };
+    }
+
+    if (Object.keys(dataToUpdate).length > 0) {
+      const updatedUser = await prisma.user.update({
+        where: { id: session.userId as string },
+        data: dataToUpdate,
+      });
+      
+      // Update session with new details if needed
+      await setSession({ userId: updatedUser.id, email: updatedUser.email, name: updatedUser.name });
+      revalidatePath('/settings');
+      return { success: 'Settings updated successfully' };
+    }
+  } catch (error) {
+    console.error('Update settings error:', error);
+    return { error: 'Failed to update settings' };
+  }
+  
+  return { success: 'No changes made' };
+}

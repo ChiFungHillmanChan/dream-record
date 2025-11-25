@@ -4,16 +4,45 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Moon, Mic, Save, RotateCcw, Search, Trash2, Edit2, 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon,
-  Download, Upload, FileJson
+  Download, Upload, FileJson, Settings
 } from 'lucide-react';
-import { DreamData, getDreams, saveDream, deleteDream, analyzeDream } from '@/app/actions';
+import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult } from '@/app/actions';
 import type { Dream } from '@prisma/client';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 
 // --- Types & Constants ---
 type CalendarMode = 'month' | 'week' | 'day';
+
+interface SpeechRecognitionEvent {
+    resultIndex: number;
+    results: {
+        [key: number]: {
+            [key: number]: {
+                transcript: string;
+            };
+            isFinal: boolean;
+        };
+        length: number;
+    };
+}
+
+interface SpeechRecognition extends EventTarget {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    start(): void;
+    stop(): void;
+    onresult: (event: SpeechRecognitionEvent) => void;
+    onend: () => void;
+}
+
+interface WindowWithSpeech extends Window {
+    SpeechRecognition?: { new(): SpeechRecognition };
+    webkitSpeechRecognition?: { new(): SpeechRecognition };
+}
 
 const TAG_PALETTE = [
   '#a78bfa', '#22d3ee', '#fb7185', '#34d399', '#fbbf24', 
@@ -72,10 +101,10 @@ export default function DreamJournal() {
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [customTagInput, setCustomTagInput] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [analysisResult, setAnalysisResult] = useState<DreamAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // History/Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,14 +128,15 @@ export default function DreamJournal() {
   // Speech Recognition Setup
   useEffect(() => {
     if (typeof window !== 'undefined') {
-        const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const win = window as unknown as WindowWithSpeech;
+        const SR = win.SpeechRecognition || win.webkitSpeechRecognition;
         if (SR) {
             const recognition = new SR();
             recognition.lang = 'zh-Hant';
             recognition.continuous = true;
             recognition.interimResults = true;
             
-            recognition.onresult = (event: any) => {
+            recognition.onresult = (event: SpeechRecognitionEvent) => {
                 let finalText = '';
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     if (event.results[i].isFinal) {
@@ -339,12 +369,17 @@ export default function DreamJournal() {
           </div>
         </div>
         
-        <div className="hidden md:flex flex-wrap items-center gap-3 p-2.5 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)]">
-            <div>
-                <div className="text-2xl font-extrabold tracking-wide">{getStreak()} 日</div>
-                <div className="text-xs text-[var(--muted)]">連續紀錄</div>
+        <div className="flex items-center gap-3">
+            <div className="hidden md:flex flex-wrap items-center gap-3 p-2.5 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)]">
+                <div>
+                    <div className="text-2xl font-extrabold tracking-wide">{getStreak()} 日</div>
+                    <div className="text-xs text-[var(--muted)]">連續紀錄</div>
+                </div>
+                {renderStreakGrid()}
             </div>
-            {renderStreakGrid()}
+            <Link href="/settings" className="p-2 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] hover:bg-white/5 transition-colors text-[var(--muted)] hover:text-white">
+                <Settings size={20} />
+            </Link>
         </div>
       </header>
       
@@ -533,7 +568,7 @@ export default function DreamJournal() {
                 </div>
                 <select 
                     value={filterType} 
-                    onChange={(e: any) => setFilterType(e.target.value)}
+                    onChange={(e) => setFilterType(e.target.value as 'all' | 'dream' | 'no_dream')}
                     className="px-3 py-2 rounded-xl bg-[#0f1230] border border-[var(--border)] text-sm"
                 >
                     <option value="all">全部</option>

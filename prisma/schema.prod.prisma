@@ -4,18 +4,31 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  dreams    Dream[]
 }
 
 model Dream {
   id        String   @id @default(cuid())
-  content   String   @db.Text
-  type      String   @default("dream") // "dream" | "no_dream"
-  date      String   // YYYY-MM-DD
-  tags      String   @db.Text // JSON string of tags
-  analysis  String?  @db.Text
+  content   String
+  type      String   @default("dream")
+  date      String
+  tags      String   @default("[]")
+  analysis  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([date])
 }

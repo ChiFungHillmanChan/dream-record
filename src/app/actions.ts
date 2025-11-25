@@ -1,22 +1,34 @@
 'use server';
 
-import { prisma } from '@/lib/prisma'; // We need to create this
+import { prisma } from '@/lib/prisma';
 import { Dream } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { getOpenAI } from '@/app/services/openai';
 import { loadPromptFile } from '@/app/services/load-prompts';
+import { getSession } from '@/lib/auth';
 
 export type DreamData = {
   content: string;
   type: 'dream' | 'no_dream';
   date: string;
-  tags: string[]; // We'll JSON.stringify this before saving
+  tags: string[];
   id?: string;
+};
+
+export type DreamAnalysisResult = {
+  analysis: string;
+  vibe: string;
+  reflection: string;
+  summary: string;
 };
 
 export async function getDreams(): Promise<Dream[]> {
   try {
+    const session = await getSession();
+    if (!session?.userId) return [];
+
     return await prisma.dream.findMany({
+      where: { userId: session.userId as string },
       orderBy: { createdAt: 'desc' },
     });
   } catch (error) {
@@ -27,10 +39,19 @@ export async function getDreams(): Promise<Dream[]> {
 
 export async function saveDream(data: DreamData): Promise<{ success: boolean; error?: string }> {
   try {
+    const session = await getSession();
+    if (!session?.userId) return { success: false, error: 'Not authenticated' };
+
     const { id, tags, ...rest } = data;
     const tagsJson = JSON.stringify(tags);
 
     if (id) {
+      // Verify ownership
+      const existing = await prisma.dream.findUnique({ where: { id } });
+      if (!existing || existing.userId !== session.userId) {
+         return { success: false, error: 'Dream not found or unauthorized' };
+      }
+
       await prisma.dream.update({
         where: { id },
         data: {
@@ -43,6 +64,7 @@ export async function saveDream(data: DreamData): Promise<{ success: boolean; er
         data: {
           ...rest,
           tags: tagsJson,
+          userId: session.userId as string,
         },
       });
     }
@@ -56,6 +78,15 @@ export async function saveDream(data: DreamData): Promise<{ success: boolean; er
 
 export async function deleteDream(id: string): Promise<{ success: boolean }> {
   try {
+    const session = await getSession();
+    if (!session?.userId) return { success: false };
+
+    // Verify ownership
+    const existing = await prisma.dream.findUnique({ where: { id } });
+    if (!existing || existing.userId !== session.userId) {
+        return { success: false };
+    }
+
     await prisma.dream.delete({ where: { id } });
     revalidatePath('/');
     return { success: true };
@@ -65,7 +96,7 @@ export async function deleteDream(id: string): Promise<{ success: boolean }> {
   }
 }
 
-export async function analyzeDream(content: string): Promise<{ analysis: string; vibe: string; reflection: string; summary: string } | null> {
+export async function analyzeDream(content: string): Promise<DreamAnalysisResult | null> {
   const openai = getOpenAI();
   if (!openai) return null;
 
@@ -110,7 +141,8 @@ export async function analyzeDream(content: string): Promise<{ analysis: string;
         const outputMessage = response.output.find(item => item.type === 'message');
         const textContent = outputMessage?.content?.find(item => item.type === 'output_text')?.text;
         if (textContent) {
-            return JSON.parse(textContent);
+            const result = JSON.parse(textContent);
+            return result;
         }
     }
     return null;
@@ -120,4 +152,3 @@ export async function analyzeDream(content: string): Promise<{ analysis: string;
     return null;
   }
 }
-

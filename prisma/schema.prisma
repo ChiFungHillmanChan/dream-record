@@ -19,3 +19,4 @@ model Dream {
 
   @@index([date])
 }
+
