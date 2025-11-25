@@ -2,7 +2,7 @@
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getStripe, STRIPE_PRICES } from '@/app/services/stripe';
+import { STRIPE_PAYMENT_LINKS, getStripe } from '@/app/services/stripe';
 
 export type CheckoutResult = {
   success: boolean;
@@ -11,7 +11,8 @@ export type CheckoutResult = {
 };
 
 /**
- * Create a Stripe Checkout session
+ * Get Stripe Payment Link URL with user tracking
+ * Uses pre-configured Payment Links from Stripe Dashboard
  */
 export async function createCheckoutSession(
   billingPeriod: 'monthly' | 'yearly'
@@ -21,68 +22,28 @@ export async function createCheckoutSession(
     return { success: false, error: 'Not authenticated' };
   }
 
-  const stripe = getStripe();
-  if (!stripe) {
-    return { success: false, error: 'Stripe not configured. Please contact support.' };
-  }
-
   // Get user details
   const user = await prisma.user.findUnique({
     where: { id: session.userId as string },
-    select: { id: true, email: true, name: true, plan: true },
+    select: { id: true, email: true },
   });
 
   if (!user) {
     return { success: false, error: 'User not found' };
   }
 
-  // Select the appropriate price ID
-  const priceId = billingPeriod === 'yearly'
-    ? STRIPE_PRICES.DEEP_YEARLY
-    : STRIPE_PRICES.DEEP_MONTHLY;
+  // Get the appropriate Payment Link
+  const paymentLink = billingPeriod === 'yearly'
+    ? STRIPE_PAYMENT_LINKS.DEEP_YEARLY
+    : STRIPE_PAYMENT_LINKS.DEEP_MONTHLY;
 
-  if (!priceId) {
-    return {
-      success: false,
-      error: `Stripe price not configured for ${billingPeriod} plan. Please contact support.`,
-    };
-  }
+  // Append client_reference_id to track the user
+  // This will be included in the webhook event
+  const url = new URL(paymentLink);
+  url.searchParams.set('client_reference_id', user.id);
+  url.searchParams.set('prefilled_email', user.email);
 
-  // Get base URL - use NEXT_PUBLIC_BASE_URL or fallback
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000';
-
-  // Create checkout session
-  const checkoutSession = await stripe.checkout.sessions.create({
-    mode: 'subscription',
-    payment_method_types: ['card'],
-    line_items: [
-      {
-        price: priceId,
-        quantity: 1,
-      },
-    ],
-    customer_email: user.email,
-    success_url: `${baseUrl}/settings?success=true&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${baseUrl}/settings?canceled=true`,
-    metadata: {
-      userId: user.id,
-      billingPeriod,
-    },
-    subscription_data: {
-      metadata: {
-        userId: user.id,
-        billingPeriod,
-      },
-    },
-    // Allow customers to apply promotion codes
-    allow_promotion_codes: true,
-  });
-
-  if (!checkoutSession.url) {
-    return { success: false, error: 'Failed to create checkout session' };
-  }
-
-  return { success: true, url: checkoutSession.url };
+  return { success: true, url: url.toString() };
 }
 
 /**

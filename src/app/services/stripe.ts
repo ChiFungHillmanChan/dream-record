@@ -21,14 +21,23 @@ export function getStripe(): Stripe | null {
 }
 
 /**
- * Get Stripe Price IDs from environment
- * These should be configured in Stripe Dashboard first
+ * Stripe Payment Links - Pre-configured checkout pages
+ * These links are created in Stripe Dashboard > Payment Links
+ */
+export const STRIPE_PAYMENT_LINKS = {
+  // Monthly plan: HK$29.99/month
+  DEEP_MONTHLY: 'https://buy.stripe.com/14A5kF0Jx8jO6VRfdC2ZO01',
+  // Yearly plan: HK$200/year
+  DEEP_YEARLY: 'https://buy.stripe.com/7sY4gBgIvcA43JFghG2ZO02',
+} as const;
+
+/**
+ * Get Stripe Price IDs from environment (for Checkout Sessions API)
+ * Only needed if using programmatic checkout instead of Payment Links
  */
 export function getStripePrices() {
   return {
-    // Monthly plan: HK$39.99/month
     DEEP_MONTHLY: process.env.STRIPE_PRICE_DEEP_MONTHLY ?? '',
-    // Yearly plan: HK$143.96/year (70% off)  
     DEEP_YEARLY: process.env.STRIPE_PRICE_DEEP_YEARLY ?? '',
   };
 }

@@ -93,15 +93,27 @@ export async function POST(request: NextRequest) {
 
 /**
  * Handle successful checkout session
+ * Works with both Checkout API (metadata.userId) and Payment Links (client_reference_id)
  */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const userId = session.metadata?.userId;
+  // Payment Links use client_reference_id, Checkout API uses metadata
+  const userId = session.client_reference_id ?? session.metadata?.userId;
   if (!userId) {
-    console.error('No userId in checkout session metadata');
+    console.error('No userId in checkout session (checked client_reference_id and metadata)');
     return;
   }
 
-  const billingPeriod = session.metadata?.billingPeriod ?? 'monthly';
+  // Determine billing period from the subscription or default to monthly
+  // Payment Links: Check the price amount to determine if yearly
+  // Checkout API: Use metadata.billingPeriod
+  let billingPeriod = session.metadata?.billingPeriod ?? 'monthly';
+  
+  // For Payment Links, check the amount to determine yearly vs monthly
+  // HK$200 yearly = 20000 cents, HK$29.99 monthly = 2999 cents
+  if (session.amount_total && session.amount_total >= 10000) {
+    billingPeriod = 'yearly';
+  }
+  
   const durationMonths = billingPeriod === 'yearly' ? 12 : 1;
   
   const planExpiresAt = new Date();
@@ -122,9 +134,29 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
  * Handle subscription updates
  */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  const userId = subscription.metadata?.userId;
+  // Try to get userId from metadata first
+  let userId: string | undefined = subscription.metadata?.userId;
+  
+  // If no userId in metadata, try to find user by customer email
   if (!userId) {
-    console.log('No userId in subscription metadata');
+    const stripe = getStripe();
+    if (stripe && subscription.customer) {
+      const customerId = typeof subscription.customer === 'string' 
+        ? subscription.customer 
+        : subscription.customer.id;
+      const customer = await stripe.customers.retrieve(customerId);
+      if (customer && !customer.deleted && 'email' in customer && customer.email) {
+        const user = await prisma.user.findUnique({
+          where: { email: customer.email },
+          select: { id: true },
+        });
+        userId = user?.id;
+      }
+    }
+  }
+  
+  if (!userId) {
+    console.log('Could not find userId for subscription');
     return;
   }
 
@@ -151,9 +183,29 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
  * Handle subscription deletion/cancellation
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  const userId = subscription.metadata?.userId;
+  // Try to get userId from metadata first
+  let userId: string | undefined = subscription.metadata?.userId;
+  
+  // If no userId in metadata, try to find user by customer email
   if (!userId) {
-    console.log('No userId in subscription metadata');
+    const stripe = getStripe();
+    if (stripe && subscription.customer) {
+      const customerId = typeof subscription.customer === 'string' 
+        ? subscription.customer 
+        : subscription.customer.id;
+      const customer = await stripe.customers.retrieve(customerId);
+      if (customer && !customer.deleted && 'email' in customer && customer.email) {
+        const user = await prisma.user.findUnique({
+          where: { email: customer.email },
+          select: { id: true },
+        });
+        userId = user?.id;
+      }
+    }
+  }
+  
+  if (!userId) {
+    console.log('Could not find userId for subscription deletion');
     return;
   }
 
