@@ -795,27 +795,29 @@ export default function DreamJournal() {
                                 try {
                                     const analysis = JSON.parse(dream.analysis);
                                     return (
-                                        <Link href={`/analysis/${dream.id}`} className="block mb-3 p-3 bg-[var(--surface)] rounded-lg text-xs border border-white/5 space-y-1 hover:border-[var(--accent)]/30 transition-colors">
-                                            <div className="text-[var(--accent2)] font-bold mb-1 flex items-center gap-2">
-                                                <Sparkles size={12} />
-                                                AI 分析報告
-                                                <span className="ml-auto text-[10px] text-[var(--muted)]">點擊查看完整 →</span>
+                                        <div className="mb-3 p-4 bg-[var(--surface)] rounded-xl border border-white/5 space-y-3 hover:border-[var(--accent)]/30 transition-colors group/card">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="w-8 h-8 rounded-full bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)]">
+                                                    <Sparkles size={14} />
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-[var(--accent2)] text-sm">AI 夢境解析報告</div>
+                                                    <div className="text-[10px] text-[var(--muted)]">點擊下方按鈕查看完整內容</div>
+                                                </div>
                                             </div>
-                                            <p className="line-clamp-2"><span className="opacity-70">摘要：</span>{analysis.summary}</p>
-                                            <p><span className="opacity-70">氛圍：</span>{analysis.vibe}</p>
                                             
-                                            {analysis.analysis ? (
-                                                <div className="pt-2 mt-2 border-t border-white/5">
-                                                    <p className="line-clamp-2"><span className="opacity-70">深度解析：</span>{analysis.analysis}</p>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5 text-[var(--muted)]">
-                                                    <Lock size={12} />
-                                                    <span>解鎖深度解析</span>
-                                                    <span className="text-[10px] bg-[var(--accent)] text-white px-1.5 py-0.5 rounded ml-auto">Upgrade</span>
-                                                </div>
-                                            )}
-                                        </Link>
+                                            <div className="pl-2 border-l-2 border-[var(--accent)]/20 space-y-2">
+                                                <p className="text-sm line-clamp-2"><span className="text-[var(--muted)] text-xs uppercase mr-2">摘要</span>{analysis.summary}</p>
+                                                <p className="text-sm"><span className="text-[var(--muted)] text-xs uppercase mr-2">氛圍</span>{analysis.vibe}</p>
+                                            </div>
+                                            
+                                            <Link 
+                                                href={`/analysis/${dream.id}`}
+                                                className="flex items-center justify-center gap-2 w-full py-2.5 mt-2 rounded-lg bg-[#1e1b4b] hover:bg-[#2e1065] text-indigo-200 text-xs font-bold border border-indigo-500/20 transition-all group-hover/card:border-indigo-500/50 group-hover/card:shadow-lg group-hover/card:shadow-indigo-500/10"
+                                            >
+                                                <Sparkles size={12} /> 查看完整報告 (Full Report)
+                                            </Link>
+                                        </div>
                                     );
                                 } catch { return null; }
                             })()}

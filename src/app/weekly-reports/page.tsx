@@ -14,7 +14,7 @@ export default async function WeeklyReportsPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-[#f8f9fa]">
+    <main className="min-h-screen bg-[#0f1230]">
        <WeeklyReportsClient 
          initialReports={reports} 
          userPlan={user.plan} 
