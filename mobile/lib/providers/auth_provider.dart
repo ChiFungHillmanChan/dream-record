@@ -3,40 +3,34 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
-  final ApiService _api = ApiService();
+  final ApiService _api;
   
   User? _user;
   bool _isLoading = false;
+  bool _isAuthenticated = false;
   String? _error;
-  bool _isInitialized = false;
+
+  AuthProvider(this._api) {
+    _checkAuth();
+  }
 
   User? get user => _user;
   bool get isLoading => _isLoading;
+  bool get isAuthenticated => _isAuthenticated;
   String? get error => _error;
-  bool get isLoggedIn => _user != null;
-  bool get isInitialized => _isInitialized;
 
-  AuthProvider() {
-    _init();
-  }
-
-  Future<void> _init() async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      final isLoggedIn = await _api.isLoggedIn();
-      if (isLoggedIn) {
+  Future<void> _checkAuth() async {
+    final token = await _api.getToken();
+    if (token != null) {
+      try {
         _user = await _api.getCurrentUser();
+        _isAuthenticated = _user != null;
+      } catch (e) {
+        _isAuthenticated = false;
+        await _api.clearToken();
       }
-    } catch (e) {
-      // Token might be invalid, user will need to login again
-      _user = null;
-    } finally {
-      _isLoading = false;
-      _isInitialized = true;
-      notifyListeners();
     }
+    notifyListeners();
   }
 
   Future<bool> login(String identifier, String password) async {
@@ -47,22 +41,24 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await _api.login(identifier, password);
       
-      if (response['success'] == true) {
-        _user = await _api.getCurrentUser();
-        _isLoading = false;
+      if (response['success'] == true && response['user'] != null) {
+        _user = User.fromJson(response['user']);
+        _isAuthenticated = true;
+        _error = null;
         notifyListeners();
         return true;
       } else {
         _error = response['error'] ?? '登入失敗';
-        _isLoading = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _error = '網絡錯誤，請稍後再試';
-      _isLoading = false;
+      _error = _parseError(e);
       notifyListeners();
       return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -86,44 +82,50 @@ class AuthProvider extends ChangeNotifier {
         username: username,
       );
       
-      if (response['success'] == true) {
-        _user = await _api.getCurrentUser();
-        _isLoading = false;
+      if (response['success'] == true && response['user'] != null) {
+        _user = User.fromJson(response['user']);
+        _isAuthenticated = true;
+        _error = null;
         notifyListeners();
         return true;
       } else {
         _error = response['error'] ?? '註冊失敗';
-        _isLoading = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _error = '網絡錯誤，請稍後再試';
-      _isLoading = false;
+      _error = _parseError(e);
       notifyListeners();
       return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
   Future<void> logout() async {
     await _api.logout();
     _user = null;
+    _isAuthenticated = false;
     notifyListeners();
-  }
-
-  Future<void> refreshUser() async {
-    try {
-      _user = await _api.getCurrentUser();
-      notifyListeners();
-    } catch (e) {
-      // Ignore errors during refresh
-    }
   }
 
   void clearError() {
     _error = null;
     notifyListeners();
   }
+
+  String _parseError(dynamic error) {
+    if (error is Exception) {
+      final errorStr = error.toString();
+      // Try to extract error message from DioException
+      if (errorStr.contains('error')) {
+        final match = RegExp(r'"error":"([^"]+)"').firstMatch(errorStr);
+        if (match != null) {
+          return match.group(1) ?? '發生錯誤，請稍後再試';
+        }
+      }
+    }
+    return '發生錯誤，請稍後再試';
+  }
 }
-
-

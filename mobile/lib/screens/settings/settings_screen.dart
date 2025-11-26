@@ -10,270 +10,326 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-        title: const Text('設定'),
-      ),
-      body: Consumer<AuthProvider>(
-        builder: (context, auth, _) {
-          final user = auth.user;
-          
-          return ListView(
-            padding: const EdgeInsets.all(16),
+      body: GradientBackground(
+        child: SafeArea(
+          child: Column(
             children: [
-              // User info card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
+              // Header
+              Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => context.go('/'),
+                      icon: const Icon(Icons.arrow_back, color: AppTheme.muted),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '設定',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.txt,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(12),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 60,
+                      // User info card
+                      Consumer<AuthProvider>(
+                        builder: (context, auth, _) {
+                          final user = auth.user;
+                          return Container(
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                colors: [AppTheme.primary, AppTheme.accent],
-                              ),
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppTheme.border),
                             ),
-                            child: Center(
-                              child: Text(
-                                user?.name?.substring(0, 1).toUpperCase() ?? '?',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Avatar
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: const LinearGradient(
+                                      colors: [AppTheme.accent, AppTheme.accent2],
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.accent.withOpacity(0.4),
+                                        blurRadius: 20,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      user?.name.isNotEmpty == true 
+                                          ? user!.name[0].toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                
                                 Text(
                                   user?.name ?? '未知用戶',
                                   style: const TextStyle(
-                                    fontSize: 18,
+                                    fontSize: 20,
                                     fontWeight: FontWeight.bold,
+                                    color: AppTheme.txt,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   user?.email ?? '',
                                   style: const TextStyle(
+                                    fontSize: 14,
                                     color: AppTheme.muted,
                                   ),
                                 ),
-                                if (user?.username != null) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '@${user!.username}',
-                                    style: const TextStyle(
-                                      color: AppTheme.muted,
-                                      fontSize: 14,
+                                
+                                // Plan badge
+                                if (user?.plan == 'DEEP') ...[
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.purple.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.workspace_premium,
+                                          size: 16,
+                                          color: Colors.amber,
+                                        ),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          '深度版',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.purple,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ],
                             ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
-                      const Divider(color: AppTheme.border),
+                      
+                      // Settings options
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildSettingItem(
+                              icon: Icons.person_outline,
+                              title: '個人資料',
+                              onTap: () {
+                                // TODO: Navigate to profile edit
+                              },
+                            ),
+                            const Divider(color: AppTheme.border, height: 1),
+                            _buildSettingItem(
+                              icon: Icons.notifications_outlined,
+                              title: '通知設定',
+                              onTap: () {
+                                // TODO: Navigate to notification settings
+                              },
+                            ),
+                            const Divider(color: AppTheme.border, height: 1),
+                            _buildSettingItem(
+                              icon: Icons.lock_outline,
+                              title: '隱私設定',
+                              onTap: () {
+                                // TODO: Navigate to privacy settings
+                              },
+                            ),
+                            const Divider(color: AppTheme.border, height: 1),
+                            _buildSettingItem(
+                              icon: Icons.help_outline,
+                              title: '幫助與支援',
+                              onTap: () {
+                                // TODO: Navigate to help
+                              },
+                            ),
+                            const Divider(color: AppTheme.border, height: 1),
+                            _buildSettingItem(
+                              icon: Icons.info_outline,
+                              title: '關於',
+                              onTap: () {
+                                showAboutDialog(
+                                  context: context,
+                                  applicationName: '夢境紀錄器',
+                                  applicationVersion: '1.0.0',
+                                  applicationLegalese: '© 2024 Dream Record',
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       
-                      // Plan info
-                      Row(
-                        children: [
-                          const Icon(Icons.star_outline, color: AppTheme.muted, size: 20),
-                          const SizedBox(width: 8),
-                          const Text('方案：'),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: user?.isPremium == true
-                                  ? Colors.amber.withOpacity(0.2)
-                                  : AppTheme.surfaceSoft,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: user?.isPremium == true
-                                    ? Colors.amber
-                                    : AppTheme.border,
+                      // Logout button
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () async {
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  backgroundColor: AppTheme.surface,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  title: const Text(
+                                    '確認登出',
+                                    style: TextStyle(color: AppTheme.txt),
+                                  ),
+                                  content: const Text(
+                                    '你確定要登出嗎？',
+                                    style: TextStyle(color: AppTheme.muted),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('取消'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.danger,
+                                      ),
+                                      child: const Text('登出'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              
+                              if (confirmed == true && context.mounted) {
+                                await context.read<AuthProvider>().logout();
+                                if (context.mounted) {
+                                  context.go('/login');
+                                }
+                              }
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.logout,
+                                    color: AppTheme.danger,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    '登出',
+                                    style: TextStyle(
+                                      color: AppTheme.danger,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (user?.isPremium == true)
-                                  const Icon(Icons.workspace_premium, size: 16, color: Colors.amber),
-                                if (user?.isPremium == true)
-                                  const SizedBox(width: 4),
-                                Text(
-                                  user?.isPremium == true ? '深度版' : '免費版',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: user?.isPremium == true
-                                        ? Colors.amber
-                                        : AppTheme.muted,
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      
-                      // Remaining analyses
-                      Row(
-                        children: [
-                          const Icon(Icons.auto_awesome, color: AppTheme.muted, size: 20),
-                          const SizedBox(width: 8),
-                          const Text('剩餘解析次數：'),
-                          const Spacer(),
-                          Text(
-                            user?.isPremium == true 
-                                ? '無限' 
-                                : '${user?.remainingAnalyses ?? 0}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-
-              // Settings options
-              const Text(
-                '設定',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.muted,
-                ),
-              ),
-              const SizedBox(height: 8),
-              
-              Card(
-                child: Column(
-                  children: [
-                    _SettingsTile(
-                      icon: Icons.language,
-                      title: '語言',
-                      trailing: const Text('繁體中文'),
-                      onTap: () {
-                        // Language selection
-                      },
-                    ),
-                    const Divider(height: 1, color: AppTheme.border),
-                    _SettingsTile(
-                      icon: Icons.notifications_outlined,
-                      title: '通知',
-                      trailing: const Icon(Icons.chevron_right, color: AppTheme.muted),
-                      onTap: () {
-                        // Notification settings
-                      },
-                    ),
-                    const Divider(height: 1, color: AppTheme.border),
-                    _SettingsTile(
-                      icon: Icons.info_outline,
-                      title: '關於',
-                      trailing: const Text('v1.0.0'),
-                      onTap: () {
-                        showAboutDialog(
-                          context: context,
-                          applicationName: '夢境紀錄',
-                          applicationVersion: '1.0.0',
-                          applicationLegalese: '© 2024 Dream Record',
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Logout button
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      backgroundColor: AppTheme.surface,
-                      title: const Text('確認登出'),
-                      content: const Text('確定要登出嗎？'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('取消'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('登出'),
-                        ),
-                      ],
-                    ),
-                  );
-                  
-                  if (confirmed == true && context.mounted) {
-                    await auth.logout();
-                    if (context.mounted) {
-                      context.go('/login');
-                    }
-                  }
-                },
-                icon: const Icon(Icons.logout),
-                label: const Text('登出'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.surface,
-                  foregroundColor: AppTheme.danger,
-                  side: const BorderSide(color: AppTheme.danger),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-              const SizedBox(height: 32),
             ],
-          );
-        },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, color: AppTheme.muted, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppTheme.txt,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                color: AppTheme.muted,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
-
-class _SettingsTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-
-  const _SettingsTile({
-    required this.icon,
-    required this.title,
-    this.trailing,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: AppTheme.muted),
-      title: Text(title),
-      trailing: trailing,
-      onTap: onTap,
-    );
-  }
-}
-
-

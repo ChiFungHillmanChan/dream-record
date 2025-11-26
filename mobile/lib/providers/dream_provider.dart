@@ -1,210 +1,61 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import '../models/dream.dart';
 import '../services/api_service.dart';
-import '../providers/auth_provider.dart';
 
 class DreamProvider extends ChangeNotifier {
-  final ApiService _api = ApiService();
-  AuthProvider? _auth;
+  final ApiService _api;
   
   List<Dream> _dreams = [];
   bool _isLoading = false;
   bool _isAnalyzing = false;
+  bool _isRecording = false;
   bool _isTranscribing = false;
   String? _error;
+  Map<String, dynamic>? _analysisResult;
+
+  DreamProvider(this._api);
 
   List<Dream> get dreams => _dreams;
   bool get isLoading => _isLoading;
   bool get isAnalyzing => _isAnalyzing;
+  bool get isRecording => _isRecording;
   bool get isTranscribing => _isTranscribing;
   String? get error => _error;
+  Map<String, dynamic>? get analysisResult => _analysisResult;
 
-  void updateAuth(AuthProvider auth) {
-    _auth = auth;
-    if (auth.isLoggedIn) {
-      loadDreams();
-    } else {
-      _dreams = [];
-      notifyListeners();
-    }
-  }
-
-  Future<void> loadDreams() async {
-    if (_auth == null || !_auth!.isLoggedIn) return;
-
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      _dreams = await _api.getDreams();
-    } catch (e) {
-      _error = '載入夢境失敗';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<Dream?> getDream(String id) async {
-    try {
-      return await _api.getDream(id);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  Future<bool> saveDream({
-    required String content,
-    required String type,
-    required String date,
-    required List<String> tags,
-    String? analysis,
-    String? id,
-  }) async {
-    _error = null;
-
-    try {
-      Map<String, dynamic> response;
-      
-      if (id != null) {
-        response = await _api.updateDream(
-          id: id,
-          content: content,
-          type: type,
-          date: date,
-          tags: tags,
-          analysis: analysis,
-        );
-      } else {
-        response = await _api.createDream(
-          content: content,
-          type: type,
-          date: date,
-          tags: tags,
-          analysis: analysis,
-        );
-      }
-      
-      if (response['success'] == true) {
-        await loadDreams();
-        return true;
-      } else {
-        _error = response['error'] ?? '保存失敗';
-        notifyListeners();
-        return false;
-      }
-    } catch (e) {
-      _error = '網絡錯誤';
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<bool> deleteDream(String id) async {
-    _error = null;
-
-    try {
-      final response = await _api.deleteDream(id);
-      
-      if (response['success'] == true) {
-        _dreams.removeWhere((d) => d.id == id);
-        notifyListeners();
-        return true;
-      } else {
-        _error = response['error'] ?? '刪除失敗';
-        notifyListeners();
-        return false;
-      }
-    } catch (e) {
-      _error = '網絡錯誤';
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<DreamAnalysis?> analyzeDream(String content) async {
-    _isAnalyzing = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final response = await _api.analyzeDream(content);
-      
-      if (response['success'] == true && response['result'] != null) {
-        _isAnalyzing = false;
-        notifyListeners();
-        
-        // Refresh user to update remaining analyses count
-        _auth?.refreshUser();
-        
-        return DreamAnalysis.fromJson(response['result']);
-      } else {
-        _error = response['error'] ?? 'AI 分析失敗';
-        _isAnalyzing = false;
-        notifyListeners();
-        return null;
-      }
-    } catch (e) {
-      _error = '網絡錯誤';
-      _isAnalyzing = false;
-      notifyListeners();
-      return null;
-    }
-  }
-
-  Future<String?> transcribeAudio(File audioFile) async {
-    _isTranscribing = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final response = await _api.transcribeAudio(audioFile);
-      
-      if (response['success'] == true && response['text'] != null) {
-        _isTranscribing = false;
-        notifyListeners();
-        return response['text'];
-      } else {
-        _error = response['error'] ?? '語音轉文字失敗';
-        _isTranscribing = false;
-        notifyListeners();
-        return null;
-      }
-    } catch (e) {
-      _error = '網絡錯誤';
-      _isTranscribing = false;
-      notifyListeners();
-      return null;
-    }
-  }
-
-  // Helper methods
-  List<Dream> getDreamsForDate(String date) {
-    return _dreams.where((d) => d.date == date).toList();
-  }
-
-  bool hasNoDreamForDate(String date) {
-    return _dreams.any((d) => d.date == date && d.type == 'no_dream');
-  }
-
-  int get totalDreams => _dreams.length;
-  int get dreamCount => _dreams.where((d) => d.type == 'dream').length;
-  int get noDreamCount => _dreams.where((d) => d.type == 'no_dream').length;
-
+  // Calculate streak
   int getStreak() {
-    final uniqueDates = _dreams.map((d) => d.date).toSet();
+    if (_dreams.isEmpty) return 0;
+    
     final today = DateTime.now();
+    final todayStr = DateFormat('yyyy-MM-dd').format(today);
+    
+    // Sort dreams by date descending
+    final sortedDreams = List<Dream>.from(_dreams)
+      ..sort((a, b) => b.date.compareTo(a.date));
+    
+    // Get unique dates
+    final uniqueDates = sortedDreams.map((d) => d.date).toSet().toList()
+      ..sort((a, b) => b.compareTo(a));
+    
+    if (uniqueDates.isEmpty) return 0;
+    
     int streak = 0;
+    DateTime checkDate = today;
+    
+    // Check if today has a dream
+    if (!uniqueDates.contains(todayStr)) {
+      // Check yesterday
+      checkDate = today.subtract(const Duration(days: 1));
+    }
     
     for (int i = 0; i < 365; i++) {
-      final date = today.subtract(Duration(days: i));
-      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      
+      final dateStr = DateFormat('yyyy-MM-dd').format(checkDate);
       if (uniqueDates.contains(dateStr)) {
         streak++;
-      } else if (i > 0) {
+        checkDate = checkDate.subtract(const Duration(days: 1));
+      } else {
         break;
       }
     }
@@ -212,10 +63,111 @@ class DreamProvider extends ChangeNotifier {
     return streak;
   }
 
+  Future<void> loadDreams() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _dreams = await _api.getDreams();
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> saveDream({
+    String? id,
+    required String content,
+    required List<String> tags,
+    required String type,
+    String? analysis,
+  }) async {
+    _error = null;
+    
+    try {
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      
+      await _api.saveDream(
+        id: id,
+        content: content,
+        tags: tags,
+        type: type,
+        date: today,
+        analysis: analysis ?? (_analysisResult != null ? _analysisResult.toString() : null),
+      );
+      
+      await loadDreams();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteDream(String id) async {
+    _error = null;
+    
+    try {
+      await _api.deleteDream(id);
+      _dreams.removeWhere((d) => d.id == id);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> analyzeDream(String content) async {
+    _isAnalyzing = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _analysisResult = await _api.analyzeDream(content);
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isAnalyzing = false;
+      notifyListeners();
+    }
+  }
+
+  void clearAnalysis() {
+    _analysisResult = null;
+    notifyListeners();
+  }
+
+  // Voice recording methods (placeholder - actual implementation would use record package)
+  Future<void> startRecording() async {
+    _isRecording = true;
+    notifyListeners();
+    // TODO: Implement actual recording using record package
+  }
+
+  Future<String?> stopRecording() async {
+    _isRecording = false;
+    _isTranscribing = true;
+    notifyListeners();
+    
+    try {
+      // TODO: Implement actual transcription
+      // For now, return empty string
+      await Future.delayed(const Duration(seconds: 1));
+      return '';
+    } finally {
+      _isTranscribing = false;
+      notifyListeners();
+    }
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();
   }
 }
-
-

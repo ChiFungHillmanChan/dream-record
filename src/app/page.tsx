@@ -21,6 +21,41 @@ import { DreamResult } from '@/components/DreamResult';
 // --- Types & Constants ---
 type CalendarMode = 'month' | 'week' | 'day';
 
+// Web Speech API types for browser-based voice recognition
+interface SpeechRecognitionEvent {
+    resultIndex: number;
+    results: {
+        [key: number]: {
+            [key: number]: {
+                transcript: string;
+            };
+            isFinal: boolean;
+        };
+        length: number;
+    };
+}
+
+interface SpeechRecognitionErrorEvent {
+    error: string;
+    message?: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    start(): void;
+    stop(): void;
+    onresult: (event: SpeechRecognitionEvent) => void;
+    onerror: (event: SpeechRecognitionErrorEvent) => void;
+    onend: () => void;
+}
+
+interface WindowWithSpeech extends Window {
+    SpeechRecognition?: { new(): SpeechRecognition };
+    webkitSpeechRecognition?: { new(): SpeechRecognition };
+}
+
 const TAG_PALETTE = [
   '#a78bfa', '#22d3ee', '#fb7185', '#34d399', '#fbbf24', 
   '#f472b6', '#60a5fa', '#f87171', '#c084fc', '#2dd4bf'
@@ -101,13 +136,18 @@ export default function DreamJournal() {
   const [analysisResult, setAnalysisResult] = useState<DreamAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const isListeningRef = useRef(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   
-  // Voice Recording with Whisper API
+  // Voice Recognition - Hybrid approach:
+  // - Web Speech API for browsers (desktop, iOS Safari, etc.)
+  // - OpenAI Whisper for PWA installed to home screen (standalone mode)
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isPWAMode, setIsPWAMode] = useState(false);
 
   // History/Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -174,15 +214,86 @@ export default function DreamJournal() {
     setRemainingAnalyses(remaining);
   };
 
-  // Voice Recording Setup - Using Whisper API for all platforms
-  // This provides consistent behavior across browsers, mobile, and PWA modes
+  // Detect PWA standalone mode (app added to home screen)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Check if running as installed PWA
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+        || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+      setIsPWAMode(isStandalone);
+    }
+  }, []);
 
-  // Transcribe audio using Whisper API (for PWA fallback)
+  // Web Speech API Setup - for browsers (desktop, iOS Safari, etc.)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !isPWAMode) {
+        const win = window as WindowWithSpeech;
+        const SR = win.SpeechRecognition || win.webkitSpeechRecognition;
+        if (SR) {
+            const recognition = new SR();
+            // Use zh-HK (Traditional Chinese HK) for better browser support
+            recognition.lang = 'zh-HK';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            
+            recognition.onresult = (event: SpeechRecognitionEvent) => {
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    }
+                }
+
+                if (finalTranscript) {
+                    setDreamText(prev => prev + (prev ? '' : '') + finalTranscript);
+                }
+            };
+
+            recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+                console.error('Speech recognition error:', event.error);
+                if (event.error === 'not-allowed') {
+                    alert('請允許權限以傳送夢囈 🎤');
+                    isListeningRef.current = false;
+                    setIsListening(false);
+                } else if (event.error === 'network') {
+                    alert('靈界連結中斷，請檢查網絡 🌐');
+                    isListeningRef.current = false;
+                    setIsListening(false);
+                } else if (event.error === 'audio-capture') {
+                    alert('尋不到傳音法器（麥克風），請確認連接 🎙️');
+                    isListeningRef.current = false;
+                    setIsListening(false);
+                }
+                // Ignore 'no-speech' and 'aborted' errors - these happen often
+            };
+
+            recognition.onend = () => {
+               // Check if we should still be listening (auto-restart if stopped unexpectedly)
+               if (isListeningRef.current) {
+                   try {
+                       recognition.start();
+                   } catch {
+                       // If start fails (e.g. already started), stop properly
+                       setIsListening(false);
+                       isListeningRef.current = false;
+                   }
+               } else {
+                   setIsListening(false);
+               }
+            };
+
+            recognitionRef.current = recognition;
+        }
+    }
+  }, [isPWAMode]);
+
+  // Transcribe audio using Whisper API (for PWA mode only)
   const transcribeAudio = async (audioBlob: Blob) => {
       setIsTranscribing(true);
       try {
           const formData = new FormData();
-          // Whisper works best with webm or mp4, but we'll send what we have
           formData.append('audio', audioBlob, 'recording.webm');
           
           const response = await fetch('/api/transcribe', {
@@ -206,7 +317,7 @@ export default function DreamJournal() {
       }
   };
 
-  // Start voice recording with MediaRecorder
+  // Start voice recording with MediaRecorder (for PWA Whisper mode)
   const startRecording = async () => {
       try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -249,7 +360,7 @@ export default function DreamJournal() {
       }
   };
 
-  // Stop voice recording
+  // Stop voice recording (for PWA Whisper mode)
   const stopRecording = () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
           mediaRecorderRef.current.stop();
@@ -259,12 +370,46 @@ export default function DreamJournal() {
       setIsListening(false);
   };
 
-  // Toggle recording on/off
-  const toggleListening = () => {
-      if (isRecordingAudio) {
-          stopRecording();
+  // Toggle Web Speech API listening (for browser mode)
+  const toggleWebSpeechListening = () => {
+      if (!recognitionRef.current) {
+          alert('此法器（瀏覽器）無法接收夢囈 😢\n建議更換 Chrome 或 Edge');
+          return;
+      }
+      if (isListening) {
+          isListeningRef.current = false;
+          try {
+              recognitionRef.current.stop();
+          } catch {
+              // Ignore errors when stopping
+          }
+          setIsListening(false);
       } else {
-          startRecording();
+          isListeningRef.current = true;
+          try {
+              recognitionRef.current.start();
+              setIsListening(true);
+          } catch (err) {
+              console.error('Failed to start speech recognition:', err);
+              isListeningRef.current = false;
+              setIsListening(false);
+              alert('連結失敗，請確認麥克風權限 🎤');
+          }
+      }
+  };
+
+  // Toggle recording/listening based on mode
+  const toggleListening = () => {
+      if (isPWAMode) {
+          // PWA mode: use Whisper API
+          if (isRecordingAudio) {
+              stopRecording();
+          } else {
+              startRecording();
+          }
+      } else {
+          // Browser mode: use Web Speech API
+          toggleWebSpeechListening();
       }
   };
 
@@ -711,7 +856,7 @@ export default function DreamJournal() {
                                     : "bg-gradient-to-r from-[#67e8f9] to-[#a78bfa] text-[#001]"
                         )}
                     >
-                        <Mic size={14} /> {isTranscribing ? '轉換中...' : isListening ? '停止錄音' : '錄音口述'}
+                        <Mic size={14} /> {isTranscribing ? '轉換中...' : isListening ? (isPWAMode ? '停止錄音' : '停止聆聽') : '錄音口述'}
                     </button>
                     <button 
                         onClick={() => {

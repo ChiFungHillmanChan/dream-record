@@ -1,21 +1,20 @@
-import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../utils/constants.dart';
 import '../models/user.dart';
 import '../models/dream.dart';
-import '../models/weekly_report.dart';
 
 class ApiService {
-  static final ApiService _instance = ApiService._internal();
-  factory ApiService() => _instance;
-  
   late final Dio _dio;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   
-  ApiService._internal() {
+  // TODO: Update this to your actual API URL
+  // For local development, use your machine's IP address instead of localhost
+  // e.g., 'http://192.168.1.100:3000/api'
+  static const String baseUrl = 'http://localhost:3000/api';
+  
+  ApiService() {
     _dio = Dio(BaseOptions(
-      baseUrl: ApiConstants.baseUrl,
+      baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
       headers: {
@@ -23,47 +22,52 @@ class ApiService {
       },
     ));
     
-    // Add auth interceptor
+    // Add interceptor for authentication
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await _storage.read(key: StorageKeys.authToken);
+        final token = await _storage.read(key: 'auth_token');
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
         return handler.next(options);
       },
-      onError: (error, handler) {
-        // Handle 401 errors (token expired)
+      onError: (error, handler) async {
         if (error.response?.statusCode == 401) {
-          // Token expired - clear storage
-          _storage.delete(key: StorageKeys.authToken);
+          // Token expired or invalid, clear storage
+          await _storage.delete(key: 'auth_token');
         }
         return handler.next(error);
       },
     ));
   }
-
-  // ==================== Auth ====================
-
+  
+  // Token management
+  Future<void> setToken(String token) async {
+    await _storage.write(key: 'auth_token', value: token);
+  }
+  
+  Future<String?> getToken() async {
+    return await _storage.read(key: 'auth_token');
+  }
+  
+  Future<void> clearToken() async {
+    await _storage.delete(key: 'auth_token');
+  }
+  
+  // Auth endpoints
   Future<Map<String, dynamic>> login(String identifier, String password) async {
-    final response = await _dio.post(
-      ApiConstants.login,
-      data: {
-        'identifier': identifier,
-        'password': password,
-      },
-    );
+    final response = await _dio.post('/auth/login', data: {
+      'identifier': identifier,
+      'password': password,
+    });
     
-    if (response.data['success'] == true) {
-      await _storage.write(
-        key: StorageKeys.authToken,
-        value: response.data['token'],
-      );
+    if (response.data['token'] != null) {
+      await setToken(response.data['token']);
     }
     
     return response.data;
   }
-
+  
   Future<Map<String, dynamic>> register({
     required String email,
     required String password,
@@ -71,155 +75,104 @@ class ApiService {
     required String name,
     String? username,
   }) async {
-    final response = await _dio.post(
-      ApiConstants.register,
-      data: {
-        'email': email,
-        'password': password,
-        'confirmPassword': confirmPassword,
-        'name': name,
-        'username': username,
-      },
-    );
+    final response = await _dio.post('/auth/register', data: {
+      'email': email,
+      'password': password,
+      'confirmPassword': confirmPassword,
+      'name': name,
+      if (username != null) 'username': username,
+    });
     
-    if (response.data['success'] == true) {
-      await _storage.write(
-        key: StorageKeys.authToken,
-        value: response.data['token'],
-      );
+    if (response.data['token'] != null) {
+      await setToken(response.data['token']);
     }
     
     return response.data;
   }
-
+  
   Future<User?> getCurrentUser() async {
     try {
-      final response = await _dio.get(ApiConstants.me);
-      if (response.data['success'] == true) {
+      final response = await _dio.get('/auth/me');
+      if (response.data['user'] != null) {
         return User.fromJson(response.data['user']);
       }
+      return null;
     } catch (e) {
-      // Token might be invalid
+      return null;
     }
-    return null;
   }
-
+  
   Future<void> logout() async {
-    await _storage.delete(key: StorageKeys.authToken);
+    await clearToken();
   }
-
-  Future<bool> isLoggedIn() async {
-    final token = await _storage.read(key: StorageKeys.authToken);
-    return token != null;
-  }
-
-  // ==================== Dreams ====================
-
+  
+  // Dream endpoints
   Future<List<Dream>> getDreams() async {
-    final response = await _dio.get(ApiConstants.dreams);
-    if (response.data['success'] == true) {
-      final dreamsJson = response.data['dreams'] as List;
-      return dreamsJson.map((json) => Dream.fromJson(json)).toList();
-    }
-    return [];
+    final response = await _dio.get('/dreams');
+    final List<dynamic> dreamsJson = response.data['dreams'] ?? [];
+    return dreamsJson.map((json) => Dream.fromJson(json)).toList();
   }
-
-  Future<Dream?> getDream(String id) async {
-    final response = await _dio.get('${ApiConstants.dreams}/$id');
-    if (response.data['success'] == true) {
+  
+  Future<Dream?> getDreamById(String id) async {
+    final response = await _dio.get('/dreams/$id');
+    if (response.data['dream'] != null) {
       return Dream.fromJson(response.data['dream']);
     }
     return null;
   }
-
-  Future<Map<String, dynamic>> createDream({
+  
+  Future<void> saveDream({
+    String? id,
     required String content,
+    required List<String> tags,
     required String type,
     required String date,
-    required List<String> tags,
     String? analysis,
   }) async {
-    final response = await _dio.post(
-      ApiConstants.dreams,
-      data: {
-        'content': content,
-        'type': type,
-        'date': date,
-        'tags': tags,
-        'analysis': analysis,
-      },
-    );
-    return response.data;
-  }
-
-  Future<Map<String, dynamic>> updateDream({
-    required String id,
-    String? content,
-    String? type,
-    String? date,
-    List<String>? tags,
-    String? analysis,
-  }) async {
-    final response = await _dio.put(
-      '${ApiConstants.dreams}/$id',
-      data: {
-        if (content != null) 'content': content,
-        if (type != null) 'type': type,
-        if (date != null) 'date': date,
-        if (tags != null) 'tags': tags,
-        if (analysis != null) 'analysis': analysis,
-      },
-    );
-    return response.data;
-  }
-
-  Future<Map<String, dynamic>> deleteDream(String id) async {
-    final response = await _dio.delete('${ApiConstants.dreams}/$id');
-    return response.data;
-  }
-
-  // ==================== Analysis ====================
-
-  Future<Map<String, dynamic>> analyzeDream(String content) async {
-    final response = await _dio.post(
-      ApiConstants.analysis,
-      data: {'content': content},
-    );
-    return response.data;
-  }
-
-  // ==================== Weekly Reports ====================
-
-  Future<List<WeeklyReport>> getWeeklyReports() async {
-    final response = await _dio.get(ApiConstants.weeklyReports);
-    if (response.data['success'] == true) {
-      final reportsJson = response.data['reports'] as List;
-      return reportsJson.map((json) => WeeklyReport.fromJson(json)).toList();
+    final data = {
+      'content': content,
+      'tags': tags,
+      'type': type,
+      'date': date,
+      if (analysis != null) 'analysis': analysis,
+    };
+    
+    if (id != null) {
+      await _dio.put('/dreams/$id', data: data);
+    } else {
+      await _dio.post('/dreams', data: data);
     }
-    return [];
   }
-
-  Future<Map<String, dynamic>> generateWeeklyReport() async {
-    final response = await _dio.post(ApiConstants.weeklyReports);
-    return response.data;
+  
+  Future<void> deleteDream(String id) async {
+    await _dio.delete('/dreams/$id');
   }
-
-  // ==================== Transcription ====================
-
-  Future<Map<String, dynamic>> transcribeAudio(File audioFile) async {
+  
+  // Analysis endpoint
+  Future<Map<String, dynamic>> analyzeDream(String content) async {
+    final response = await _dio.post('/analysis', data: {
+      'content': content,
+    });
+    return response.data['result'] ?? {};
+  }
+  
+  // Weekly reports endpoints
+  Future<List<dynamic>> getWeeklyReports() async {
+    final response = await _dio.get('/weekly-reports');
+    return response.data['reports'] ?? [];
+  }
+  
+  Future<void> generateWeeklyReport() async {
+    await _dio.post('/weekly-reports');
+  }
+  
+  // Transcription endpoint
+  Future<String> transcribeAudio(List<int> audioData) async {
     final formData = FormData.fromMap({
-      'audio': await MultipartFile.fromFile(
-        audioFile.path,
-        filename: 'recording.webm',
-      ),
+      'audio': MultipartFile.fromBytes(audioData, filename: 'recording.webm'),
     });
     
-    final response = await _dio.post(
-      ApiConstants.transcribe,
-      data: formData,
-    );
-    return response.data;
+    final response = await _dio.post('/transcribe', data: formData);
+    return response.data['text'] ?? '';
   }
 }
-
-
