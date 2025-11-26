@@ -6,9 +6,9 @@ import {
   ChevronLeft, ChevronRight,
   Download, Upload, Settings, Shield, Crown, Lock, Sparkles
 } from 'lucide-react';
-import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo, getRemainingFreeAnalyses } from '@/app/actions';
+import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo, getRemainingFreeAnalyses, getWeeklyReports, WeeklyReportData } from '@/app/actions';
 import { ROLES, PLANS } from '@/lib/constants';
-import type { Dream } from '@prisma/client';
+import type { Dream, WeeklyReport } from '@prisma/client';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -71,6 +71,22 @@ function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
+function getDaysInWeek(date: Date): Date[] {
+  const result: Date[] = [];
+  const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+  const startOfWeek = new Date(date);
+  startOfWeek.setDate(date.getDate() - dayOfWeek); // Go back to Sunday
+  
+  // Get all 7 days of the week
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(startOfWeek);
+    day.setDate(startOfWeek.getDate() + i);
+    result.push(day);
+  }
+  
+  return result;
+}
+
 // --- Helper Components ---
 
 const Chip = ({ label, active, onClick, onRemove }: { label: string, active?: boolean, onClick?: () => void, onRemove?: () => void }) => {
@@ -103,6 +119,7 @@ export default function DreamJournal() {
   
   // Data State
   const [dreams, setDreams] = useState<Dream[]>([]);
+  const [weeklyReports, setWeeklyReports] = useState<WeeklyReport[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUserInfo>(null);
   const [remainingAnalyses, setRemainingAnalyses] = useState<number>(20); // Initialize with default free limit
 
@@ -226,8 +243,12 @@ export default function DreamJournal() {
   };
 
   const loadDreams = async () => {
-    const data = await getDreams();
-    setDreams(data);
+    const [dreamsData, reportsData] = await Promise.all([
+      getDreams(),
+      getWeeklyReports()
+    ]);
+    setDreams(dreamsData);
+    setWeeklyReports(reportsData);
   };
 
   // Stats
@@ -713,15 +734,26 @@ export default function DreamJournal() {
                 <div className="flex items-center gap-2 flex-1 justify-end">
                     <button onClick={() => {
                         const d = new Date(currentDate);
-                        d.setMonth(d.getMonth() - 1);
+                        if (calendarMode === 'month') d.setMonth(d.getMonth() - 1);
+                        else if (calendarMode === 'week') d.setDate(d.getDate() - 7);
+                        else d.setDate(d.getDate() - 1);
                         setCurrentDate(d);
                     }} className="p-2 rounded-lg bg-[#0f1230] border border-[var(--border)]"><ChevronLeft size={14}/></button>
                     <span className="font-bold min-w-[100px] text-center">
-                        {currentDate.getFullYear()} 年 {currentDate.getMonth() + 1} 月
+                        {calendarMode === 'month' && `${currentDate.getFullYear()} 年 ${currentDate.getMonth() + 1} 月`}
+                        {calendarMode === 'week' && (() => {
+                            const days = getDaysInWeek(currentDate);
+                            const start = days[0];
+                            const end = days[6];
+                            return `${start.getMonth() + 1}/${start.getDate()} - ${end.getMonth() + 1}/${end.getDate()}`;
+                        })()}
+                        {calendarMode === 'day' && selectedDateStr}
                     </span>
                     <button onClick={() => {
                         const d = new Date(currentDate);
-                        d.setMonth(d.getMonth() + 1);
+                        if (calendarMode === 'month') d.setMonth(d.getMonth() + 1);
+                        else if (calendarMode === 'week') d.setDate(d.getDate() + 7);
+                        else d.setDate(d.getDate() + 1);
                         setCurrentDate(d);
                     }} className="p-2 rounded-lg bg-[#0f1230] border border-[var(--border)]"><ChevronRight size={14}/></button>
                 </div>
@@ -762,6 +794,112 @@ export default function DreamJournal() {
                             </button>
                         );
                      })}
+                 </div>
+             )}
+
+             {calendarMode === 'week' && (
+                 <div className="space-y-6">
+                    {/* Weekly Report Summary */}
+                    {(() => {
+                        const days = getDaysInWeek(currentDate);
+                        const weekStart = days[0].toISOString().split('T')[0];
+                        const weekEnd = days[6].toISOString().split('T')[0];
+                        
+                        const report = weeklyReports.find(r => {
+                            const rStart = new Date(r.startDate).toISOString().split('T')[0];
+                            // Simple check if report starts on same week
+                            return rStart === weekStart;
+                        });
+
+                        if (report) {
+                            const data = JSON.parse(report.analysis) as WeeklyReportData;
+                            return (
+                                <Link href="/weekly-reports" className="block relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1e1b4b] to-[#0f1230] border border-purple-500/30 shadow-xl group">
+                                    {/* Background Image */}
+                                    {report.imageBase64 && (
+                                        <div className="absolute inset-0 opacity-30 group-hover:opacity-40 transition-opacity">
+                                            <img 
+                                                src={`data:image/png;base64,${report.imageBase64}`} 
+                                                alt="Weekly Viz" 
+                                                className="w-full h-full object-cover blur-sm group-hover:blur-none transition-all duration-700"
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-[#0f1230] via-[#0f1230]/80 to-transparent" />
+                                        </div>
+                                    )}
+                                    
+                                    <div className="relative p-6 flex flex-col md:flex-row gap-6 items-start md:items-center">
+                                        <div className="flex-1">
+                                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-bold uppercase tracking-wider mb-3">
+                                                <Sparkles size={12} /> Weekly Insight
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-white mb-2">{data.word_of_the_week}</h3>
+                                            <p className="text-slate-300 text-sm line-clamp-2">{data.summary}</p>
+                                        </div>
+                                        <div className="flex items-center justify-center w-full md:w-auto">
+                                            <div className="px-4 py-2 rounded-xl bg-white/10 backdrop-blur border border-white/10 text-white text-xs font-bold group-hover:bg-white/20 transition-all">
+                                                View Report
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Link>
+                            );
+                        }
+                        return (
+                            <div className="p-6 rounded-2xl bg-[#0f1230] border border-dashed border-white/10 text-center">
+                                <p className="text-slate-500 text-sm">本週尚未生成 AI 週報</p>
+                            </div>
+                        );
+                    })()}
+
+                    {/* Week Timeline */}
+                    <div className="space-y-4">
+                        {getDaysInWeek(currentDate).map((day) => {
+                            const dateStr = day.toISOString().split('T')[0];
+                            const dayDreams = dreams.filter(d => d.date === dateStr);
+                            const isToday = dateStr === new Date().toISOString().split('T')[0];
+                            
+                            return (
+                                <div key={dateStr} className={cn("relative pl-8 border-l-2", isToday ? "border-purple-500" : "border-white/10")}>
+                                    <div className={cn(
+                                        "absolute -left-[9px] top-0 w-4 h-4 rounded-full border-4 border-[#0f1230]",
+                                        isToday ? "bg-purple-500" : "bg-white/20"
+                                    )} />
+                                    
+                                    <div className="mb-2 flex items-baseline gap-2">
+                                        <span className="font-bold text-white">{day.getMonth() + 1}/{day.getDate()}</span>
+                                        <span className="text-xs text-slate-500">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()]}</span>
+                                    </div>
+
+                                    {dayDreams.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {dayDreams.map(dream => (
+                                                <div key={dream.id} onClick={() => { setSelectedDateStr(dateStr); setCalendarMode('day'); }} className="cursor-pointer group bg-[#1a1d3d] hover:bg-[#23264d] p-4 rounded-xl border border-white/5 transition-all">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <span className="text-xs text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded">
+                                                            {dream.type === 'dream' ? 'Dream' : 'No Dream'}
+                                                        </span>
+                                                        {dream.analysis && <Sparkles size={12} className="text-amber-400" />}
+                                                    </div>
+                                                    <p className="text-sm text-slate-300 line-clamp-2 mb-2">{dream.content}</p>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {(() => {
+                                                            try {
+                                                                return JSON.parse(dream.tags).map((t: string) => (
+                                                                    <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-black/30 text-slate-400">#{t}</span>
+                                                                ));
+                                                            } catch { return null; }
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-xs text-slate-600 italic">No records</div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                  </div>
              )}
 

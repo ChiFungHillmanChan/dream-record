@@ -2,8 +2,7 @@
 
 import { useState, useActionState, useEffect } from 'react';
 import { updateSettings, deleteAccount, logout, setupSuperAdmin } from '../actions/auth';
-import { createCustomerPortalSession } from '../actions/stripe';
-import { STRIPE_PAYMENT_LINKS } from '@/app/services/stripe';
+import { createCheckoutSession, createCustomerPortalSession } from '../actions/stripe';
 import { motion } from 'framer-motion';
 import { User, Mail, Lock, Save, Trash2, LogOut, Settings as SettingsIcon, ArrowLeft, Crown, Shield, Calendar, CreditCard, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
@@ -63,20 +62,19 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
     }
   }, [searchParams]);
   
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     setIsCheckingOut(true);
     setCheckoutError(null);
     
-    // Direct redirect to Stripe Payment Link (no server action needed)
-    const paymentLink = billingPeriod === 'yearly'
-      ? STRIPE_PAYMENT_LINKS.DEEP_YEARLY
-      : STRIPE_PAYMENT_LINKS.DEEP_MONTHLY;
+    // Use server action to get Payment Link URL with client_reference_id
+    const result = await createCheckoutSession(billingPeriod);
     
-    // Append email for pre-filling
-    const url = new URL(paymentLink);
-    url.searchParams.set('prefilled_email', user.email);
-    
-    window.location.href = url.toString();
+    if (result.success && result.url) {
+      window.location.href = result.url;
+    } else {
+      setCheckoutError(result.error ?? '無法創建結帳頁面');
+      setIsCheckingOut(false);
+    }
   };
   
   const handleManageSubscription = async () => {
