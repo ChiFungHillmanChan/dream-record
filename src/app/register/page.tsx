@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { register } from '../actions/auth';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { User, Lock, Mail, ArrowRight, Sparkles } from 'lucide-react';
+import { User, Lock, Mail, ArrowRight, Sparkles, AtSign } from 'lucide-react';
 
 const initialState = {
   error: '',
@@ -51,6 +51,24 @@ export default function RegisterPage() {
                 className="w-full bg-black/20 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-gray-500 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-300 ml-1">
+              用戶名稱 <span className="text-gray-500">(選填，可用於登入)</span>
+            </label>
+            <div className="relative group">
+              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
+              <input
+                name="username"
+                type="text"
+                placeholder="dreamer123"
+                pattern="^[a-zA-Z0-9_]{3,20}$"
+                title="3-20 字元，只可使用英文字母、數字和底線"
+                className="w-full bg-black/20 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-gray-500 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all"
+              />
+            </div>
+            <p className="text-xs text-gray-500 ml-1">3-20 字元，只可使用英文字母、數字和底線</p>
           </div>
 
           <div className="space-y-2">

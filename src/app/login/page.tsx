@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import { login } from '../actions/auth';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Moon, Lock, Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Moon, Lock, Mail, ArrowRight, Eye, EyeOff, AtSign } from 'lucide-react';
 
 const initialState = {
   error: '',
@@ -41,14 +41,14 @@ export default function LoginPage() {
 
         <form action={formAction} className="space-y-6">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300 ml-1">電郵地址</label>
+            <label className="text-sm font-medium text-gray-300 ml-1">電郵地址或用戶名稱</label>
             <div className="relative group">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
+              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
               <input
-                name="email"
-                type="email"
+                name="identifier"
+                type="text"
                 required
-                placeholder="dreamer@example.com"
+                placeholder="電郵或用戶名稱"
                 className="w-full bg-black/20 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-gray-500 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all"
               />
             </div>

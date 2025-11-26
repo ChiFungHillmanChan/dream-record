@@ -10,6 +10,7 @@ export async function register(prevState: unknown, formData: FormData) {
   const password = formData.get('password') as string;
   const confirmPassword = formData.get('confirmPassword') as string;
   const name = formData.get('name') as string;
+  const username = (formData.get('username') as string)?.trim() || null;
 
   if (!email || !password || !name) {
     return { error: '所有欄位皆為必填' };
@@ -23,6 +24,13 @@ export async function register(prevState: unknown, formData: FormData) {
     return { error: '兩次輸入的密碼不相符' };
   }
 
+  // Validate username format if provided
+  if (username) {
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      return { error: '用戶名稱只可使用 3-20 個英文字母、數字或底線' };
+    }
+  }
+
   try {
     const existingUser = await prisma.user.findUnique({
       where: { email },
@@ -32,6 +40,16 @@ export async function register(prevState: unknown, formData: FormData) {
       return { error: '此電郵已被註冊' };
     }
 
+    // Check if username is taken (if provided)
+    if (username) {
+      const existingUsername = await prisma.user.findUnique({
+        where: { username },
+      });
+      if (existingUsername) {
+        return { error: '此用戶名稱已被使用' };
+      }
+    }
+
     const hashedPassword = await hashPassword(password);
 
     const user = await prisma.user.create({
@@ -39,6 +57,7 @@ export async function register(prevState: unknown, formData: FormData) {
         email,
         password: hashedPassword,
         name,
+        username,
       },
     });
 
@@ -58,26 +77,36 @@ export async function register(prevState: unknown, formData: FormData) {
 }
 
 export async function login(prevState: unknown, formData: FormData) {
-  const email = formData.get('email') as string;
+  const identifier = formData.get('identifier') as string;
   const password = formData.get('password') as string;
 
-  if (!email || !password) {
-    return { error: '請輸入電郵和密碼' };
+  if (!identifier || !password) {
+    return { error: '請輸入電郵/用戶名稱和密碼' };
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    // Check if identifier is an email or username
+    const isEmail = identifier.includes('@');
+    
+    let user;
+    if (isEmail) {
+      user = await prisma.user.findUnique({
+        where: { email: identifier },
+      });
+    } else {
+      user = await prisma.user.findUnique({
+        where: { username: identifier },
+      });
+    }
 
     if (!user) {
-      return { error: '電郵或密碼錯誤' };
+      return { error: '電郵/用戶名稱或密碼錯誤' };
     }
 
     const isValid = await verifyPassword(password, user.password);
 
     if (!isValid) {
-      return { error: '電郵或密碼錯誤' };
+      return { error: '電郵/用戶名稱或密碼錯誤' };
     }
 
     await setSession({ 
