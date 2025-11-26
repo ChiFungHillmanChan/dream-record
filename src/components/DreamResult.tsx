@@ -16,11 +16,11 @@ export function DreamResult({ result }: DreamResultProps) {
     // Split by numbered list pattern (e.g., "1.", "2.")
     const parts = text.split(/\n(?=\d+\.)/g);
     return parts.map(part => {
-      const match = part.match(/^(\d+\.)\s*(.+)/s);
+      const match = part.match(/^(\d+\.)\s*([\s\S]+)/);
       if (match) {
         // Check for bold title **Title**: Content
         const content = match[2];
-        const titleMatch = content.match(/^\*\*(.*?)\*\*:?\s*(.*)/s);
+        const titleMatch = content.match(/^\*\*(.*?)\*\*:?\s*([\s\S]*)/);
         if (titleMatch) {
           return { title: titleMatch[1], content: titleMatch[2] };
         }

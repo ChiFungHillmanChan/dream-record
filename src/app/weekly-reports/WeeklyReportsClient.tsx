@@ -135,7 +135,7 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
                 
                 <button
                   onClick={handleGenerate}
-                  disabled={isGenerating || (reportStatus && !reportStatus.canGenerate)}
+                  disabled={isGenerating || (reportStatus ? !reportStatus.canGenerate : false)}
                   className="relative group px-8 py-4 bg-white text-black rounded-full font-medium text-lg hover:bg-neutral-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
                 >
                   <span className="relative z-10 flex items-center">
