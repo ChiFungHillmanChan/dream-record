@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { getOpenAI } from '@/app/services/openai';
 import { loadPromptFile } from '@/app/services/load-prompts';
 import { getSession } from '@/lib/auth';
-import { PLANS, FREE_ANALYSIS_LIMIT } from '@/lib/constants';
+import { PLANS, FREE_ANALYSIS_LIMIT, ROLES } from '@/lib/constants';
 
 // User info type for header display
 export type CurrentUserInfo = {
@@ -532,11 +532,11 @@ export async function getRemainingFreeAnalyses(): Promise<number> {
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId as string },
-    select: { lifetimeAnalysisCount: true, plan: true }
+    select: { lifetimeAnalysisCount: true, plan: true, role: true }
   });
 
   if (!user) return 0;
-  if (user.plan === PLANS.DEEP) return -1; // -1 means unlimited
+  if (user.plan === PLANS.DEEP || user.role === ROLES.SUPERADMIN) return -1; // -1 means unlimited (DEEP users and SUPERADMIN)
 
   return Math.max(0, FREE_ANALYSIS_LIMIT - user.lifetimeAnalysisCount);
 }

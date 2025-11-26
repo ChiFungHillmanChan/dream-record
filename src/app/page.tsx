@@ -14,6 +14,8 @@ import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { DreamLoading } from '@/components/DreamLoading';
+import { DreamResult } from '@/components/DreamResult';
 
 // --- Types & Constants ---
 type CalendarMode = 'month' | 'week' | 'day';
@@ -415,6 +417,9 @@ export default function DreamJournal() {
 
   return (
     <div className="container max-w-4xl mx-auto p-4 min-h-screen">
+      <AnimatePresence>
+        {isAnalyzing && <DreamLoading />}
+      </AnimatePresence>
       {/* Header */}
       <header className="flex items-center justify-between p-3 border border-[var(--border)] rounded-2xl bg-[var(--surface)] mb-3 relative z-10">
         <div className="flex items-center gap-3">
@@ -433,8 +438,8 @@ export default function DreamJournal() {
                 </div>
                 {renderStreakGrid()}
             </div>
-            {/* Plan Badge */}
-            {currentUser?.plan === PLANS.DEEP && (
+            {/* Plan Badge - DEEP users and SUPERADMIN get unlimited */}
+            {(currentUser?.plan === PLANS.DEEP || currentUser?.role === ROLES.SUPERADMIN) && (
               <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/20 border border-purple-500/30">
                 <Crown size={14} className="text-amber-400" />
                 <span className="text-xs text-purple-300 font-medium">深度版</span>
@@ -523,45 +528,20 @@ export default function DreamJournal() {
                     </button>
                      <button 
                         onClick={handleAnalyze}
-                        disabled={isAnalyzing || !dreamText || (!currentUser) || (currentUser?.plan !== PLANS.DEEP && remainingAnalyses <= 0)}
+                        disabled={isAnalyzing || !dreamText || (!currentUser) || (currentUser?.plan !== PLANS.DEEP && currentUser?.role !== ROLES.SUPERADMIN && remainingAnalyses <= 0)}
                         className="px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
                     >
                         <Sparkles size={14} />
                         {isAnalyzing ? '分析中...' : 'AI 解析'}
                         {currentUser && (
                           <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
-                            {currentUser.plan === PLANS.DEEP ? '∞' : remainingAnalyses}
+                            {(currentUser.plan === PLANS.DEEP || currentUser.role === ROLES.SUPERADMIN) ? '∞' : remainingAnalyses}
                           </span>
                         )}
                     </button>
                  </div>
                  
-                 {analysisResult && (
-                    <div className="mt-2 p-4 rounded-xl bg-[var(--surface-soft)] border border-[var(--accent)]/30 text-sm space-y-2">
-                        <div className="font-bold text-[var(--accent2)]">✨ 夢境解析</div>
-                        <p><strong>摘要：</strong>{analysisResult.summary}</p>
-                        <p><strong>氛圍：</strong>{analysisResult.vibe}</p>
-                        {analysisResult.analysis ? (
-                            <>
-                                <p><strong>分析：</strong>{analysisResult.analysis}</p>
-                                <p><strong>建議：</strong>{analysisResult.reflection}</p>
-                            </>
-                        ) : (
-                            <Link href="/settings" className="block mt-3 p-3 rounded-lg bg-black/20 border border-white/5 relative overflow-hidden group">
-                                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-[2px]" />
-                                <div className="relative flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-[var(--muted)]">
-                                        <Lock size={14} />
-                                        <span className="font-medium">深度分析與建議已上鎖</span>
-                                    </div>
-                                    <div className="text-xs bg-[var(--accent)] text-white px-2 py-1 rounded-lg shadow-lg group-hover:scale-105 transition-transform">
-                                        升級解鎖
-                                    </div>
-                                </div>
-                            </Link>
-                        )}
-                    </div>
-                 )}
+                 {analysisResult && <DreamResult result={analysisResult} />}
               </div>
 
               <div>
