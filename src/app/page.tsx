@@ -96,7 +96,7 @@ export default function DreamJournal() {
   // Data State
   const [dreams, setDreams] = useState<Dream[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUserInfo>(null);
-  const [remainingAnalyses, setRemainingAnalyses] = useState<number>(0);
+  const [remainingAnalyses, setRemainingAnalyses] = useState<number>(20); // Initialize with default free limit
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'record' | 'history'>('record');
@@ -420,7 +420,7 @@ export default function DreamJournal() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-radial from-white via-[#d9d9ff] to-[var(--accent)] shadow-[0_0_12px_rgba(167,139,250,0.5)]" />
           <div>
-            <div className="font-bold text-base">Dream Record</div>
+            <div className="font-bold text-base">{currentUser?.name || 'Dream Record'}</div>
             <div className="text-xs text-[var(--muted)]">{todayStr || '載入中...'} · 醒來就記下夢的碎片吧</div>
           </div>
         </div>
@@ -523,14 +523,14 @@ export default function DreamJournal() {
                     </button>
                      <button 
                         onClick={handleAnalyze}
-                        disabled={isAnalyzing || !dreamText || (currentUser?.plan !== PLANS.DEEP && remainingAnalyses <= 0)}
+                        disabled={isAnalyzing || !dreamText || (!currentUser) || (currentUser?.plan !== PLANS.DEEP && remainingAnalyses <= 0)}
                         className="px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
                     >
                         <Sparkles size={14} />
                         {isAnalyzing ? '分析中...' : 'AI 解析'}
-                        {currentUser?.plan !== PLANS.DEEP && remainingAnalyses >= 0 && (
+                        {currentUser && (
                           <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
-                            {remainingAnalyses}
+                            {currentUser.plan === PLANS.DEEP ? '∞' : remainingAnalyses}
                           </span>
                         )}
                     </button>
