@@ -7,6 +7,7 @@ import { generateWeeklyReport, WeeklyReportData, WeeklyReportStatus } from '@/ap
 import { PLANS } from '@/lib/constants';
 import { Loader2, Lock, Sparkles, ArrowLeft, Brain, Heart, Zap, Crown, FileText, ChevronRight, Quote, Fingerprint, Calendar } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { WeeklyReport } from '@prisma/client';
 
 // Helper for tag colors (reused from main page logic)
@@ -78,7 +79,7 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
         />
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 py-8 md:py-12">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 py-12 md:py-16">
         <AnimatePresence mode="wait">
           {selectedReport ? (
             <ReportView 
@@ -90,13 +91,13 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
           ) : (
             <motion.div
               key="list-view"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.4 }}
+              initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             >
               {/* Header */}
-              <header className="flex items-center justify-between mb-12">
+              <header className="flex items-center justify-between mb-16">
                 <div className="flex items-center gap-4">
                   <Link href="/" className="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all group">
                     <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
@@ -113,35 +114,35 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
               </header>
 
               {/* Generator Section */}
-              <div className="grid lg:grid-cols-[1fr_1.5fr] gap-8 mb-16">
-                <div className="bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl p-6 rounded-3xl border border-white/10 relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all duration-500" />
+              <div className="grid lg:grid-cols-[1fr_1.5fr] gap-8 lg:gap-16 mb-20">
+                <div className="bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl p-8 rounded-[2rem] border border-white/10 relative overflow-hidden group shadow-2xl shadow-black/20">
+                   <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all duration-700" />
                    
-                   <div className="relative z-10 flex flex-col h-full justify-between">
+                   <div className="relative z-10 flex flex-col h-full justify-between gap-8">
                       <div>
-                        <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                          <Sparkles className="w-5 h-5 text-amber-300" />
+                        <h2 className="text-2xl font-bold text-white mb-3 flex items-center gap-3">
+                          <Sparkles className="w-6 h-6 text-amber-300" />
                           每週洞察
                         </h2>
-                        <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                        <p className="text-slate-400 text-base leading-relaxed mb-8">
                           將過去一週的夢境碎片拼湊成完整的潛意識地圖。發現隱藏的模式與情緒軌跡。
                         </p>
                         
                         {reportStatus && (
-                           <div className="space-y-3 mb-6 bg-black/20 p-4 rounded-xl border border-white/5">
-                             <div className="flex justify-between text-xs font-medium uppercase tracking-wider text-slate-400">
+                           <div className="space-y-4 mb-8 bg-black/20 p-5 rounded-2xl border border-white/5">
+                             <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
                                <span>每週配額</span>
                                <span className={reportStatus.reportsUsed >= reportStatus.reportsLimit ? 'text-amber-400' : 'text-white'}>
                                  {reportStatus.reportsUsed} / {reportStatus.reportsLimit}
                                </span>
                              </div>
-                             <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                             <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
                                <div 
-                                 className="bg-gradient-to-r from-purple-500 to-indigo-500 h-full rounded-full transition-all duration-500" 
+                                 className="bg-gradient-to-r from-purple-500 to-indigo-500 h-full rounded-full transition-all duration-1000 ease-out" 
                                  style={{ width: `${Math.min(100, (reportStatus.reportsUsed / reportStatus.reportsLimit) * 100)}%` }}
                                />
                              </div>
-                             <div className="flex justify-between text-[10px] text-slate-500">
+                             <div className="flex justify-between text-[11px] text-slate-500 font-medium">
                                <span>{reportStatus.daysRecorded} / {reportStatus.daysRequired} 記錄天數</span>
                                <span>重置：週日</span>
                              </div>
@@ -153,26 +154,26 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
                         <button
                           onClick={handleGenerate}
                           disabled={isGenerating || (reportStatus ? !reportStatus.canGenerate : false)}
-                          className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 group/btn relative overflow-hidden"
+                          className="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-purple-900/20 hover:shadow-purple-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-3 group/btn relative overflow-hidden"
                         >
                           <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300" />
                           {isGenerating ? (
                             <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <Loader2 className="w-5 h-5 animate-spin" />
                               <span>分析中...</span>
                             </>
                           ) : (
                             <>
                               <span>生成分析報告</span>
-                              <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                              <ChevronRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
                             </>
                           )}
                         </button>
-                        {error && <p className="mt-3 text-red-400 text-xs text-center bg-red-500/10 py-2 rounded border border-red-500/20">{error}</p>}
+                        {error && <p className="mt-4 text-red-400 text-sm text-center bg-red-500/10 py-2.5 rounded-xl border border-red-500/20">{error}</p>}
                         
                         {!reportStatus?.canGenerate && reportStatus && (
-                          <div className="mt-3 text-xs text-center text-slate-400 flex items-center justify-center gap-2">
-                            <Lock className="w-3 h-3" />
+                          <div className="mt-4 text-sm text-center text-slate-400 flex items-center justify-center gap-2 font-medium">
+                            <Lock className="w-4 h-4" />
                             {reportStatus.reportsUsed >= reportStatus.reportsLimit 
                               ? "本週額度已用完"
                               : `還需 ${Math.max(0, reportStatus.daysRequired - reportStatus.daysRecorded)} 天記錄`}
@@ -182,7 +183,7 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
                    </div>
                 </div>
 
-                <div className="flex flex-col justify-center lg:pl-8 relative">
+                <div className="flex flex-col justify-center lg:pl-12 relative">
                    <div className="absolute top-1/2 left-0 -translate-y-1/2 w-px h-32 bg-gradient-to-b from-transparent via-white/10 to-transparent hidden lg:block" />
                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 leading-tight">
                      解鎖你心靈的 <br/>
@@ -329,17 +330,18 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
          {/* Split Content */}
          <div className="flex flex-col md:flex-row border-t border-white/5">
             {/* Left Sidebar */}
-            <div className="md:w-[35%] border-r border-white/5 bg-black/20 p-6 md:p-8 space-y-8">
+            <div className="md:w-[35%] border-r border-white/5 bg-black/20 p-8 md:p-10 space-y-10">
                {/* Visualization */}
                <div className="space-y-4">
                  <h3 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">夢境映像</h3>
-                 <div className="aspect-square w-full rounded-2xl overflow-hidden border border-white/10 relative group bg-black/40">
+                 <div className="aspect-square w-full rounded-2xl overflow-hidden border border-white/10 relative group bg-black/40 shadow-inner">
                     {report.imageBase64 ? (
                       <>
-                        <img 
+                        <Image 
                           src={`data:image/png;base64,${report.imageBase64}`} 
                           alt="夢境映像" 
-                          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                          fill
+                          className="object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                       </>
@@ -359,7 +361,7 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
                  <h3 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase flex items-center gap-2">
                    <Heart className="w-3 h-3" /> 情緒軌跡
                  </h3>
-                 <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                 <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
                    <p className="text-sm text-slate-300 leading-relaxed italic">
                      &quot;{data.emotional_trajectory}&quot;
                    </p>
@@ -371,7 +373,7 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
                  <h3 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase flex items-center gap-2">
                    <Zap className="w-3 h-3" /> 日間殘留
                  </h3>
-                 <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                 <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
                    <p className="text-xs text-slate-400 leading-relaxed">
                      {data.day_residue_analysis}
                    </p>
@@ -380,7 +382,7 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
             </div>
 
             {/* Main Content */}
-            <div className="md:w-[65%] p-6 md:p-10 space-y-10 bg-gradient-to-b from-transparent to-black/20">
+            <div className="md:w-[65%] p-8 md:p-12 space-y-12 bg-gradient-to-b from-transparent to-black/20">
                {/* Summary */}
                <section>
                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
