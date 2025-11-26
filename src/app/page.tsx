@@ -111,6 +111,7 @@ export default function DreamJournal() {
   const [analysisResult, setAnalysisResult] = useState<DreamAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const isListeningRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // History/Filter State
@@ -148,24 +149,53 @@ export default function DreamJournal() {
         const SR = win.SpeechRecognition || win.webkitSpeechRecognition;
         if (SR) {
             const recognition = new SR();
-            recognition.lang = 'zh-Hant';
+            recognition.lang = 'yue-Hant-HK'; // Optimised for Cantonese
             recognition.continuous = true;
             recognition.interimResults = true;
             
             recognition.onresult = (event: SpeechRecognitionEvent) => {
-                let finalText = '';
+                let interimTranscript = '';
+                let finalTranscript = '';
+
                 for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
-                        finalText += event.results[i][0].transcript;
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
                     }
                 }
-                if (finalText) {
-                    setDreamText(prev => prev + (prev ? ' ' : '') + finalText);
+
+                if (finalTranscript) {
+                    setDreamText(prev => prev + (prev ? ' ' : '') + finalTranscript);
                 }
+                // Note: Interim results are tricky to append directly to state without duplicating
+                // For now, we rely on final results for the main text, but we could add a UI indicator for interim.
+            };
+
+            recognition.onerror = (event: any) => {
+                console.error('Speech recognition error', event.error);
+                if (event.error === 'not-allowed') {
+                    alert('請允許麥克風權限以使用語音輸入');
+                    isListeningRef.current = false;
+                    setIsListening(false);
+                }
+                // Ignore 'no-speech' errors which happen often and trigger auto-restart via onend
             };
 
             recognition.onend = () => {
-               setIsListening(false);
+               // Check if we should still be listening (auto-restart if stopped unexpectedly)
+               if (isListeningRef.current) {
+                   try {
+                       recognition.start();
+                   } catch {
+                       // If start fails (e.g. already started), stop properly
+                       setIsListening(false);
+                       isListeningRef.current = false;
+                   }
+               } else {
+                   setIsListening(false);
+               }
             };
 
             recognitionRef.current = recognition;
@@ -179,9 +209,11 @@ export default function DreamJournal() {
           return;
       }
       if (isListening) {
+          isListeningRef.current = false;
           recognitionRef.current.stop();
           setIsListening(false);
       } else {
+          isListeningRef.current = true;
           recognitionRef.current.start();
           setIsListening(true);
       }

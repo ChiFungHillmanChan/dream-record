@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { getOpenAI } from '@/app/services/openai';
 import { loadPromptFile } from '@/app/services/load-prompts';
 import { getSession } from '@/lib/auth';
-import { PLANS, FREE_ANALYSIS_LIMIT, ROLES } from '@/lib/constants';
+import { PLANS, FREE_ANALYSIS_LIMIT, FREE_WEEKLY_REPORT_LIMIT, ROLES } from '@/lib/constants';
 
 // User info type for header display
 export type CurrentUserInfo = {
@@ -111,7 +111,7 @@ export async function getDreams(): Promise<Dream[]> {
 
     const user = await prisma.user.findUnique({
       where: { id: session.userId as string },
-      select: { plan: true }
+      select: { plan: true, role: true }
     });
 
     const dreams = await prisma.dream.findMany({
@@ -119,7 +119,9 @@ export async function getDreams(): Promise<Dream[]> {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (user?.plan === PLANS.FREE) {
+    // DEEP users and SUPERADMIN get full analysis
+    const isPremium = user?.plan === PLANS.DEEP || user?.role === ROLES.SUPERADMIN;
+    if (!isPremium) {
       return dreams.map(d => ({
         ...d,
         analysis: redactAnalysis(d.analysis)
@@ -205,6 +207,7 @@ export async function analyzeDream(content: string): Promise<{ result: DreamAnal
       where: { id: session.userId as string },
       select: { 
         plan: true,
+        role: true,
         lifetimeAnalysisCount: true,
         id: true
       }
@@ -212,11 +215,11 @@ export async function analyzeDream(content: string): Promise<{ result: DreamAnal
 
   if (!user) return { result: null, error: '找不到用戶' };
 
-  // Use effective plan (in case it was just updated due to expiration)
-  const currentPlan = effectivePlan;
+  // SUPERADMIN is treated as permanent DEEP user
+  const isPremium = effectivePlan === PLANS.DEEP || user.role === ROLES.SUPERADMIN;
 
-  // Lifetime limit check for FREE users
-  if (currentPlan === PLANS.FREE && user.lifetimeAnalysisCount >= FREE_ANALYSIS_LIMIT) {
+  // Lifetime limit check for FREE users only (SUPERADMIN bypasses this)
+  if (!isPremium && user.lifetimeAnalysisCount >= FREE_ANALYSIS_LIMIT) {
     return { 
       result: null, 
       error: `免費版的 ${FREE_ANALYSIS_LIMIT} 次 AI 解析已用完。升級深度版享無限解析！` 
@@ -273,8 +276,8 @@ export async function analyzeDream(content: string): Promise<{ result: DreamAnal
         if (textContent) {
             const result = JSON.parse(textContent);
             
-            // Increment lifetime count for FREE users
-            if (currentPlan === PLANS.FREE) {
+            // Increment lifetime count for FREE users only (SUPERADMIN bypasses)
+            if (!isPremium) {
               await prisma.user.update({
                 where: { id: user.id },
                 data: { 
@@ -283,8 +286,8 @@ export async function analyzeDream(content: string): Promise<{ result: DreamAnal
               });
             }
 
-            // For FREE users, redact deep analysis
-            if (currentPlan === PLANS.FREE) {
+            // For FREE users, redact deep analysis (SUPERADMIN gets full access)
+            if (!isPremium) {
                 return {
                     result: {
                       ...result,
@@ -337,9 +340,10 @@ function getCurrentWeekBoundaries(): { weekStart: Date; weekEnd: Date } {
 }
 
 // Weekly report limits configuration
-const WEEKLY_REPORT_LIMITS = {
+// FREE: 3 lifetime reports, 5 days required per report
+// DEEP/SUPERADMIN: 2 per week (unlimited weeks), 3 days required
+const WEEKLY_REPORT_CONFIG = {
   FREE: {
-    maxReportsPerWeek: 1,
     minDaysRequired: 5,
   },
   DEEP: {
@@ -354,36 +358,44 @@ export async function generateWeeklyReport(): Promise<{ success: boolean; error?
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId as string },
-    select: { id: true, plan: true, role: true }
+    select: { id: true, plan: true, role: true, lifetimeWeeklyReportCount: true }
   });
 
   if (!user) return { success: false, error: '找不到用戶' };
 
   // Determine if user has premium access (DEEP plan or SUPERADMIN)
   const isPremium = user.plan === PLANS.DEEP || user.role === ROLES.SUPERADMIN;
-  const limits = isPremium ? WEEKLY_REPORT_LIMITS.DEEP : WEEKLY_REPORT_LIMITS.FREE;
 
   // Get current week boundaries (Sunday to Saturday)
   const { weekStart, weekEnd } = getCurrentWeekBoundaries();
 
-  // Check how many reports were already generated this week
-  const reportsThisWeek = await prisma.weeklyReport.count({
-    where: {
-      userId: user.id,
-      createdAt: {
-        gte: weekStart,
-        lte: weekEnd
+  // Check report limits
+  if (isPremium) {
+    // DEEP/SUPERADMIN: 2 reports per week
+    const reportsThisWeek = await prisma.weeklyReport.count({
+      where: {
+        userId: user.id,
+        createdAt: {
+          gte: weekStart,
+          lte: weekEnd
+        }
       }
-    }
-  });
+    });
 
-  if (reportsThisWeek >= limits.maxReportsPerWeek) {
-    return { 
-      success: false, 
-      error: isPremium 
-        ? `本週已生成 ${limits.maxReportsPerWeek} 份週報，下週日可再生成` 
-        : `免費版每週只能生成 ${limits.maxReportsPerWeek} 份週報。升級深度版可生成更多！`
-    };
+    if (reportsThisWeek >= WEEKLY_REPORT_CONFIG.DEEP.maxReportsPerWeek) {
+      return { 
+        success: false, 
+        error: `本週已生成 ${WEEKLY_REPORT_CONFIG.DEEP.maxReportsPerWeek} 份週報，下週日可再生成`
+      };
+    }
+  } else {
+    // FREE: 3 lifetime reports
+    if (user.lifetimeWeeklyReportCount >= FREE_WEEKLY_REPORT_LIMIT) {
+      return { 
+        success: false, 
+        error: `免費版的 ${FREE_WEEKLY_REPORT_LIMIT} 次週報已用完。升級深度版享每週生成！`
+      };
+    }
   }
 
   // Get dreams for the current week
@@ -400,13 +412,16 @@ export async function generateWeeklyReport(): Promise<{ success: boolean; error?
 
   // Count unique days with dream records
   const uniqueDays = new Set(dreams.map(d => d.date)).size;
+  const minDaysRequired = isPremium 
+    ? WEEKLY_REPORT_CONFIG.DEEP.minDaysRequired 
+    : WEEKLY_REPORT_CONFIG.FREE.minDaysRequired;
 
-  if (uniqueDays < limits.minDaysRequired) {
+  if (uniqueDays < minDaysRequired) {
     return { 
       success: false, 
       error: isPremium
-        ? `本週需要至少 ${limits.minDaysRequired} 天的夢境記錄才能生成週報 (目前 ${uniqueDays} 天)`
-        : `免費版需要至少 ${limits.minDaysRequired} 天的夢境記錄才能生成週報 (目前 ${uniqueDays} 天)。升級深度版只需 ${WEEKLY_REPORT_LIMITS.DEEP.minDaysRequired} 天！`
+        ? `本週需要至少 ${minDaysRequired} 天的夢境記錄才能生成週報 (目前 ${uniqueDays} 天)`
+        : `免費版需要至少 ${minDaysRequired} 天的夢境記錄才能生成週報 (目前 ${uniqueDays} 天)。升級深度版只需 ${WEEKLY_REPORT_CONFIG.DEEP.minDaysRequired} 天！`
     };
   }
 
@@ -550,6 +565,14 @@ export async function generateWeeklyReport(): Promise<{ success: boolean; error?
         }
     });
 
+    // Increment lifetime count for FREE users
+    if (!isPremium) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lifetimeWeeklyReportCount: { increment: 1 } }
+      });
+    }
+
     revalidatePath('/weekly-reports'); 
     return { success: true };
 
@@ -577,6 +600,7 @@ export type WeeklyReportStatus = {
   daysRequired: number;
   canGenerate: boolean;
   isPremium: boolean;
+  isLifetimeLimit: boolean; // true for FREE (lifetime), false for DEEP (per week)
   weekStartDate: string;
   weekEndDate: string;
 };
@@ -587,26 +611,35 @@ export async function getWeeklyReportStatus(): Promise<WeeklyReportStatus | null
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId as string },
-    select: { id: true, plan: true, role: true }
+    select: { id: true, plan: true, role: true, lifetimeWeeklyReportCount: true }
   });
 
   if (!user) return null;
 
   const isPremium = user.plan === PLANS.DEEP || user.role === ROLES.SUPERADMIN;
-  const limits = isPremium ? WEEKLY_REPORT_LIMITS.DEEP : WEEKLY_REPORT_LIMITS.FREE;
   
   const { weekStart, weekEnd } = getCurrentWeekBoundaries();
 
-  // Count reports generated this week
-  const reportsUsed = await prisma.weeklyReport.count({
-    where: {
-      userId: user.id,
-      createdAt: {
-        gte: weekStart,
-        lte: weekEnd
+  let reportsUsed: number;
+  let reportsLimit: number;
+  
+  if (isPremium) {
+    // DEEP/SUPERADMIN: 2 per week
+    reportsUsed = await prisma.weeklyReport.count({
+      where: {
+        userId: user.id,
+        createdAt: {
+          gte: weekStart,
+          lte: weekEnd
+        }
       }
-    }
-  });
+    });
+    reportsLimit = WEEKLY_REPORT_CONFIG.DEEP.maxReportsPerWeek;
+  } else {
+    // FREE: 3 lifetime
+    reportsUsed = user.lifetimeWeeklyReportCount;
+    reportsLimit = FREE_WEEKLY_REPORT_LIMIT;
+  }
 
   // Get dreams for the current week
   const dreams = await prisma.dream.findMany({
@@ -621,15 +654,19 @@ export async function getWeeklyReportStatus(): Promise<WeeklyReportStatus | null
   });
 
   const daysRecorded = new Set(dreams.map(d => d.date)).size;
-  const canGenerate = reportsUsed < limits.maxReportsPerWeek && daysRecorded >= limits.minDaysRequired;
+  const daysRequired = isPremium 
+    ? WEEKLY_REPORT_CONFIG.DEEP.minDaysRequired 
+    : WEEKLY_REPORT_CONFIG.FREE.minDaysRequired;
+  const canGenerate = reportsUsed < reportsLimit && daysRecorded >= daysRequired;
 
   return {
     reportsUsed,
-    reportsLimit: limits.maxReportsPerWeek,
+    reportsLimit,
     daysRecorded,
-    daysRequired: limits.minDaysRequired,
+    daysRequired,
     canGenerate,
     isPremium,
+    isLifetimeLimit: !isPremium,
     weekStartDate: weekStart.toISOString().split('T')[0],
     weekEndDate: weekEnd.toISOString().split('T')[0],
   };

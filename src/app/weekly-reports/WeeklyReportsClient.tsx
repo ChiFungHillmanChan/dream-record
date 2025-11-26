@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateWeeklyReport, WeeklyReportData, WeeklyReportStatus } from '@/app/actions';
 import { PLANS } from '@/lib/constants';
-import { Loader2, Lock, Sparkles, ArrowLeft, Calendar, Brain, Heart, Zap, Crown, AlertCircle } from 'lucide-react';
+import { Loader2, Lock, Sparkles, ArrowLeft, Calendar, Brain, Heart, Zap, Crown, AlertCircle, FileText, ChevronRight, Quote, Fingerprint } from 'lucide-react';
 import Link from 'next/link';
 
 // Temporary type until Prisma client is fully updated and types are shared
@@ -49,22 +49,13 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
   const isFree = userPlan === PLANS.FREE;
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans selection:bg-purple-500/30">
-      {/* Background Gradient Animation */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-900/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-900/20 rounded-full blur-[120px]" />
-      </div>
+    <div className="min-h-screen bg-[#f8f9fa] text-slate-800 font-sans selection:bg-blue-100">
+      {/* Subtle Background Pattern */}
+      <div className="fixed inset-0 z-0 opacity-[0.03] pointer-events-none" style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+      }} />
 
-      <div className="relative z-10 max-w-4xl mx-auto px-4 py-8">
-        <header className="flex items-center justify-between mb-8 md:mb-12">
-          <Link href="/" className="flex items-center text-neutral-400 hover:text-white transition-colors group">
-            <ArrowLeft className="w-5 h-5 mr-1 md:mr-2 group-hover:-translate-x-1 transition-transform" />
-            <span className="hidden md:inline">返回日記</span>
-          </Link>
-          <h1 className="text-lg md:text-xl font-light tracking-widest uppercase text-purple-400/80">夢境週報</h1>
-        </header>
-
+      <div className="relative z-10 max-w-6xl mx-auto px-4 py-8 md:py-12">
         <AnimatePresence mode="wait">
           {selectedReport ? (
             <ReportView 
@@ -76,145 +67,178 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
           ) : (
             <motion.div
               key="list-view"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
             >
-              <div className="flex flex-col items-center justify-center mb-16 text-center">
-                <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-b from-white to-white/50">
-                  探索你的潛意識週期
-                </h2>
-                <p className="text-neutral-400 max-w-xl mb-8 leading-relaxed">
-                  每週日，我們將你過去七天的夢境編織成一個故事，揭示隱藏的情緒軌跡與心理原型。
-                </p>
+              {/* Professional Header */}
+              <header className="flex items-center justify-between mb-12 pb-6 border-b border-slate-200">
+                <div className="flex items-center gap-4">
+                  <Link href="/" className="flex items-center justify-center w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all shadow-sm group">
+                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+                  </Link>
+                  <div>
+                    <h1 className="text-2xl font-serif font-bold text-slate-900 tracking-tight">Dream Analysis Reports</h1>
+                    <p className="text-sm text-slate-500 font-medium tracking-wide uppercase">Psychological Profile & Subconscious Tracking</p>
+                  </div>
+                </div>
+                <div className="hidden md:block text-right">
+                  <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Confidential</p>
+                  <p className="text-xs text-slate-400">{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}</p>
+                </div>
+              </header>
 
-                {/* Weekly Report Status */}
-                {reportStatus && (
-                  <div className="mb-8 p-4 bg-white/5 border border-white/10 rounded-2xl max-w-md w-full">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm text-neutral-400">本週週報</span>
-                      <span className="text-xs font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded-full">
-                        {new Date(reportStatus.weekStartDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })} - {new Date(reportStatus.weekEndDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="text-left">
-                        <div className="text-xs text-neutral-500 mb-1">已生成 / 上限</div>
-                        <div className="text-lg font-bold text-white">
-                          {reportStatus.reportsUsed} / {reportStatus.reportsLimit}
-                          {reportStatus.isPremium && <Crown className="inline w-4 h-4 ml-1 text-amber-400" />}
-                        </div>
+              {/* Hero Section / Generator */}
+              <div className="grid lg:grid-cols-3 gap-8 mb-16">
+                <div className="lg:col-span-1">
+                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-full flex flex-col justify-between relative overflow-hidden">
+                      <div className="relative z-10">
+                        <h2 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                          <Sparkles className="w-5 h-5 text-blue-600" />
+                          Generate Report
+                        </h2>
+                        <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+                          Compile your recent dreams into a comprehensive psychological analysis. Discover hidden patterns and subconscious shifts.
+                        </p>
+                        
+                        {reportStatus && (
+                           <div className="space-y-3 mb-6">
+                             <div className="flex justify-between text-sm">
+                               <span className="text-slate-500">Quota Status</span>
+                               <span className="font-medium text-slate-800">
+                                 {reportStatus.reportsUsed}/{reportStatus.reportsLimit}
+                                 {reportStatus.isPremium && <Crown className="inline w-3 h-3 ml-1 text-amber-500" />}
+                               </span>
+                             </div>
+                             <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                               <div 
+                                 className="bg-blue-600 h-full rounded-full transition-all duration-500" 
+                                 style={{ width: `${Math.min(100, (reportStatus.reportsUsed / reportStatus.reportsLimit) * 100)}%` }}
+                               />
+                             </div>
+                             <div className="flex justify-between text-xs text-slate-400">
+                               <span>{reportStatus.daysRecorded}/{reportStatus.daysRequired} days recorded</span>
+                               <span>Reset: Sun</span>
+                             </div>
+                           </div>
+                        )}
                       </div>
-                      <div className="text-left">
-                        <div className="text-xs text-neutral-500 mb-1">記錄天數 / 需求</div>
-                        <div className={`text-lg font-bold ${reportStatus.daysRecorded >= reportStatus.daysRequired ? 'text-green-400' : 'text-amber-400'}`}>
-                          {reportStatus.daysRecorded} / {reportStatus.daysRequired} 天
-                        </div>
-                      </div>
-                    </div>
-
-                    {!reportStatus.canGenerate && (
-                      <div className="flex items-start gap-2 text-sm text-amber-400 bg-amber-500/10 p-3 rounded-xl">
-                        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <span>
-                          {reportStatus.reportsUsed >= reportStatus.reportsLimit 
-                            ? '本週週報配額已用完' 
-                            : `還需要 ${reportStatus.daysRequired - reportStatus.daysRecorded} 天的夢境記錄`}
-                          {!reportStatus.isPremium && reportStatus.daysRecorded < reportStatus.daysRequired && (
-                            <Link href="/settings" className="ml-1 text-purple-400 hover:underline">
-                              升級深度版只需 3 天
-                            </Link>
+                      
+                      <div className="relative z-10 mt-auto">
+                        <button
+                          onClick={handleGenerate}
+                          disabled={isGenerating || (reportStatus ? !reportStatus.canGenerate : false)}
+                          className="w-full py-3 px-4 bg-slate-900 text-white rounded-lg font-medium shadow-lg shadow-slate-900/20 hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isGenerating ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Analyzing...
+                            </>
+                          ) : (
+                            <>
+                              <span>Generate Analysis</span>
+                              <ChevronRight className="w-4 h-4" />
+                            </>
                           )}
-                        </span>
+                        </button>
+                        {error && <p className="mt-3 text-red-500 text-xs text-center bg-red-50 py-2 rounded">{error}</p>}
+                        
+                        {!reportStatus?.canGenerate && reportStatus && (
+                          <div className="mt-3 text-xs text-center text-amber-600 bg-amber-50 p-2 rounded border border-amber-100">
+                            {reportStatus.reportsUsed >= reportStatus.reportsLimit 
+                              ? "Weekly quota reached"
+                              : `Need ${reportStatus.daysRequired - reportStatus.daysRecorded} more days of records`}
+                          </div>
+                        )}
                       </div>
-                    )}
+
+                      {/* Decorative bg element */}
+                      <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-50 rounded-full blur-3xl" />
+                   </div>
+                </div>
+
+                <div className="lg:col-span-2 flex flex-col justify-center pl-0 lg:pl-8">
+                   <h2 className="text-4xl font-serif font-bold text-slate-900 mb-4 leading-tight">
+                     Unlocking the <br/>
+                     <span className="text-blue-700">Architecture of Your Mind</span>
+                   </h2>
+                   <p className="text-slate-600 text-lg max-w-xl leading-relaxed">
+                     Each week, we act as your personal psychoanalyst, weaving your nightly fragments into a coherent narrative of your inner life.
+                   </p>
+                </div>
+              </div>
+
+              {/* Reports Grid */}
+              <div className="mb-8">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Archived Reports
+                </h3>
+                
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {reports.map((report, idx) => {
+                    const data = JSON.parse(report.analysis) as WeeklyReportData;
+                    const startDate = new Date(report.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const endDate = new Date(report.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    
+                    return (
+                      <motion.div
+                        key={report.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        onClick={() => setSelectedReport(report)}
+                        className="group relative bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-0 cursor-pointer hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 overflow-hidden flex flex-col h-full"
+                      >
+                        <div className="h-32 bg-slate-100 relative overflow-hidden">
+                           {report.imageBase64 ? (
+                             <div className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 grayscale group-hover:grayscale-0" 
+                                  style={{ backgroundImage: `url(data:image/png;base64,${report.imageBase64})` }} 
+                             />
+                           ) : (
+                             <div className="absolute inset-0 flex items-center justify-center">
+                               <Brain className="w-10 h-10 text-slate-300" />
+                             </div>
+                           )}
+                           <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-mono text-slate-600 shadow-sm">
+                             {startDate} - {endDate}
+                           </div>
+                        </div>
+                        
+                        <div className="p-5 flex-grow flex flex-col">
+                          <h3 className="text-xl font-serif font-bold text-slate-900 mb-2 group-hover:text-blue-700 transition-colors">
+                            {data.word_of_the_week}
+                          </h3>
+                          <p className="text-slate-500 text-sm line-clamp-3 mb-4 flex-grow leading-relaxed">
+                            {data.summary}
+                          </p>
+                          
+                          <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
+                            <span className="flex items-center gap-1">
+                              <Brain className="w-3 h-3" /> {data.themes.length} Themes
+                            </span>
+                            <span className="text-blue-600 group-hover:translate-x-1 transition-transform flex items-center gap-1">
+                              Read Report <ChevronRight className="w-3 h-3" />
+                            </span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+                
+                {reports.length === 0 && !isGenerating && (
+                  <div className="bg-white border border-slate-200 border-dashed rounded-xl p-12 text-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <FileText className="w-8 h-8 text-slate-300" />
+                    </div>
+                    <h3 className="text-lg font-medium text-slate-900 mb-1">No Reports Yet</h3>
+                    <p className="text-slate-500">Record more dreams to enable weekly analysis.</p>
                   </div>
                 )}
-                
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating || (reportStatus ? !reportStatus.canGenerate : false)}
-                  className="relative group px-8 py-4 bg-white text-black rounded-full font-medium text-lg hover:bg-neutral-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
-                >
-                  <span className="relative z-10 flex items-center">
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        正在分析夢境...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-5 h-5 mr-2" />
-                        生成本週報告
-                        {reportStatus && (
-                          <span className="ml-2 text-sm opacity-60">
-                            ({reportStatus.reportsLimit - reportStatus.reportsUsed} 次剩餘)
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 opacity-0 group-hover:opacity-20 transition-opacity duration-500 bg-[length:200%_100%] animate-gradient" />
-                </button>
-                {error && <p className="mt-4 text-red-400 text-sm">{error}</p>}
               </div>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                {reports.map((report, idx) => {
-                  const data = JSON.parse(report.analysis) as WeeklyReportData;
-                  const startDate = new Date(report.startDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
-                  const endDate = new Date(report.endDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
-                  
-                  return (
-                    <motion.div
-                      key={report.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.1 }}
-                      onClick={() => setSelectedReport(report)}
-                      className="group relative bg-neutral-900/50 border border-white/10 hover:border-purple-500/50 rounded-2xl p-6 cursor-pointer hover:bg-neutral-800/50 transition-all duration-300 overflow-hidden"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      
-                      <div className="relative z-10">
-                        <div className="flex justify-between items-start mb-4">
-                          <span className="text-xs font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded-full border border-purple-500/20">
-                            {startDate} - {endDate}
-                          </span>
-                          <Calendar className="w-4 h-4 text-neutral-500" />
-                        </div>
-                        
-                        <h3 className="text-2xl font-bold mb-2 text-white group-hover:text-purple-300 transition-colors">
-                          {data.word_of_the_week}
-                        </h3>
-                        
-                        <p className="text-neutral-400 text-sm line-clamp-2 mb-4">
-                          {data.summary}
-                        </p>
-
-                        <div className="flex items-center text-xs text-neutral-500 space-x-4">
-                          <div className="flex items-center">
-                            <Brain className="w-3 h-3 mr-1" />
-                            {data.themes.length} Themes
-                          </div>
-                          <div className="flex items-center">
-                            <Heart className="w-3 h-3 mr-1" />
-                            {data.archetypes.length} Archetypes
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-              
-              {reports.length === 0 && !isGenerating && (
-                <div className="text-center text-neutral-600 mt-12">
-                  <p>尚無週報。試著記錄更多夢境來解鎖分析。</p>
-                </div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -225,157 +249,204 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
 
 function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: boolean, onBack: () => void }) {
   const data = JSON.parse(report.analysis) as WeeklyReportData;
-  const startDate = new Date(report.startDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
-  const endDate = new Date(report.endDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
+  const startDate = new Date(report.startDate).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric' });
+  const endDate = new Date(report.endDate).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric' });
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.3 }}
-      className="bg-neutral-900 rounded-3xl border border-white/10 overflow-hidden shadow-2xl"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      transition={{ duration: 0.4 }}
+      className="bg-white shadow-2xl shadow-slate-200/50 rounded-xl overflow-hidden border border-slate-200 max-w-4xl mx-auto"
     >
-      {/* Header / Cover */}
-      <div className="relative h-64 md:h-80 w-full bg-neutral-800 overflow-hidden">
-        {report.imageBase64 ? (
-            // Using standard img tag as per rules for base64 data URI which is external-ish (not in public folder)
-            // Although base64 is technically internal data, standard img works well here.
-            <img 
-                src={`data:image/png;base64,${report.imageBase64}`} 
-                alt="Dream Collage" 
-                className="w-full h-full object-cover"
-            />
-        ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900">
-                <Sparkles className="w-12 h-12 text-white/20" />
-            </div>
-        )}
-        
-        <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-neutral-900/50 to-transparent" />
-        
-        <div className="absolute bottom-6 left-6 right-6">
-            <div className="flex items-center justify-between">
-                <button 
-                    onClick={onBack}
-                    className="p-2 bg-black/50 backdrop-blur-md rounded-full hover:bg-white/20 transition-colors text-white mb-4"
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                </button>
-                <span className="text-sm font-mono text-white/60 bg-black/50 px-3 py-1 rounded-full backdrop-blur-md">
-                    {startDate} - {endDate}
-                </span>
-            </div>
-            <h2 className="text-4xl md:text-6xl font-bold text-white mb-2">{data.word_of_the_week}</h2>
-            <p className="text-lg text-white/80 italic">{data.emotional_trajectory}</p>
+      {/* Report Header - Document Style */}
+      <div className="bg-slate-50 border-b border-slate-200 p-6 md:p-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <button 
+            onClick={onBack}
+            className="flex items-center text-slate-500 hover:text-slate-900 text-sm font-medium mb-4 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Archive
+          </button>
+          <h1 className="text-3xl md:text-4xl font-serif font-bold text-slate-900 mb-2">
+            {data.word_of_the_week}
+          </h1>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+              WEEKLY ANALYSIS
+            </span>
+            <span className="text-slate-500">
+              {startDate} - {endDate}
+            </span>
+          </div>
+        </div>
+        <div className="hidden md:block text-right">
+          <div className="text-xs font-bold tracking-widest text-slate-300 uppercase mb-1">Report ID</div>
+          <div className="font-mono text-slate-400">{report.id.slice(0, 8)}</div>
         </div>
       </div>
 
-      <div className="p-6 md:p-10 space-y-12">
-        {/* Summary Section */}
-        <section>
-            <h3 className="text-xs font-bold tracking-widest text-purple-400 uppercase mb-4">Executive Summary</h3>
-            <p className="text-xl leading-relaxed text-neutral-200">
-                {data.summary}
-            </p>
-        </section>
+      <div className="flex flex-col md:flex-row">
+        {/* Left Sidebar - Visuals & Key Metrics */}
+        <div className="md:w-1/3 bg-slate-50/50 border-r border-slate-100 p-6 md:p-8 space-y-8">
+           {/* Generated Image - Framed */}
+           <div className="space-y-3">
+             <h3 className="text-xs font-bold tracking-widest text-slate-400 uppercase">Visual Synthesis</h3>
+             <div className="aspect-square w-full bg-white p-2 border border-slate-200 shadow-sm rounded-lg rotate-1 hover:rotate-0 transition-transform duration-500">
+               {report.imageBase64 ? (
+                 <img 
+                   src={`data:image/png;base64,${report.imageBase64}`} 
+                   alt="Dream Collage" 
+                   className="w-full h-full object-cover rounded-sm grayscale-[20%] hover:grayscale-0 transition-all duration-700"
+                 />
+               ) : (
+                 <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                   <Sparkles className="text-slate-300" />
+                 </div>
+               )}
+             </div>
+             <p className="text-[10px] text-slate-400 italic text-center">
+               AI-generated subconscious visualization
+             </p>
+           </div>
 
-        {/* Emotional Curve & Day Residue */}
-        <div className="grid md:grid-cols-2 gap-8">
-            <section className="bg-white/5 p-6 rounded-2xl border border-white/5">
-                <h3 className="text-xs font-bold tracking-widest text-blue-400 uppercase mb-4 flex items-center">
-                    <Zap className="w-4 h-4 mr-2" /> Day Residue Filter
-                </h3>
-                <p className="text-neutral-300 leading-relaxed">
-                    {data.day_residue_analysis}
-                </p>
-            </section>
-            <section className="bg-white/5 p-6 rounded-2xl border border-white/5">
-                 <h3 className="text-xs font-bold tracking-widest text-pink-400 uppercase mb-4 flex items-center">
-                    <Heart className="w-4 h-4 mr-2" /> Emotional Arc
-                </h3>
-                <p className="text-neutral-300 leading-relaxed">
-                    {data.emotional_trajectory}
-                </p>
-            </section>
+           {/* Emotional Trajectory */}
+           <div className="space-y-3">
+             <h3 className="text-xs font-bold tracking-widest text-slate-400 uppercase flex items-center gap-2">
+               <Heart className="w-3 h-3" /> Emotional Arc
+             </h3>
+             <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+               <p className="text-sm text-slate-700 leading-relaxed italic">
+                 &ldquo;{data.emotional_trajectory}&rdquo;
+               </p>
+             </div>
+           </div>
+
+           {/* Day Residue */}
+           <div className="space-y-3">
+             <h3 className="text-xs font-bold tracking-widest text-slate-400 uppercase flex items-center gap-2">
+               <Zap className="w-3 h-3" /> Day Residue
+             </h3>
+             <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+               <p className="text-sm text-slate-600 leading-relaxed">
+                 {data.day_residue_analysis}
+               </p>
+             </div>
+           </div>
         </div>
 
-        {/* Themes - PREMIUM */}
-        <section className="relative">
-            <h3 className="text-xs font-bold tracking-widest text-emerald-400 uppercase mb-6 flex items-center">
-                <Brain className="w-4 h-4 mr-2" /> Recurrent Themes
-            </h3>
-            
-            <div className="grid gap-4">
-                {data.themes.map((theme, i) => (
-                    <div key={i} className={`p-5 rounded-xl bg-neutral-800/50 border border-white/5 ${isFree ? 'blur-sm select-none opacity-50' : ''}`}>
-                        <h4 className="text-lg font-semibold text-white mb-2">{theme.name}</h4>
-                        <p className="text-neutral-400">{theme.description}</p>
-                    </div>
-                ))}
-            </div>
-            
-            {isFree && (
-                <div className="absolute inset-0 flex items-center justify-center z-10">
-                    <UnlockPrompt />
-                </div>
-            )}
-        </section>
+        {/* Main Content Area */}
+        <div className="md:w-2/3 p-6 md:p-10 space-y-10">
+           {/* Executive Summary */}
+           <section>
+             <h3 className="text-lg font-serif font-bold text-slate-900 mb-4 flex items-center gap-2">
+               <FileText className="w-5 h-5 text-blue-600" />
+               Executive Summary
+             </h3>
+             <div className="prose prose-slate max-w-none">
+               <p className="text-lg leading-relaxed text-slate-700 first-letter:text-4xl first-letter:font-serif first-letter:font-bold first-letter:mr-1 first-letter:float-left">
+                 {data.summary}
+               </p>
+             </div>
+           </section>
 
-        {/* Archetypes - PREMIUM */}
-        <section className="relative">
-             <h3 className="text-xs font-bold tracking-widest text-amber-400 uppercase mb-6">Jungian Archetypes</h3>
+           <div className="h-px bg-slate-100 w-full" />
+
+           {/* Deep Insight - Highlight */}
+           <section className="bg-blue-50 p-6 rounded-xl border-l-4 border-blue-600">
+             <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wide mb-3 flex items-center gap-2">
+               <Fingerprint className="w-4 h-4" /> Core Psychological Insight
+             </h3>
+             <p className="text-blue-900 text-lg font-medium leading-relaxed">
+               {data.deep_insight || "Analysis not available in this version."}
+             </p>
+           </section>
+
+           {/* Themes */}
+           <section className="relative">
+             <h3 className="text-lg font-serif font-bold text-slate-900 mb-6 flex items-center gap-2">
+               <Brain className="w-5 h-5 text-purple-600" />
+               Recurrent Themes
+             </h3>
+             <div className="grid gap-6">
+               {data.themes.map((theme, i) => (
+                 <div key={i} className={`group ${isFree ? 'blur-sm select-none opacity-40' : ''}`}>
+                   <div className="flex items-baseline gap-3 mb-2">
+                     <span className="text-xs font-bold text-slate-300">0{i+1}</span>
+                     <h4 className="text-base font-bold text-slate-800 group-hover:text-purple-700 transition-colors">
+                       {theme.name}
+                     </h4>
+                   </div>
+                   <p className="text-slate-600 text-sm leading-relaxed pl-7 border-l border-slate-200 group-hover:border-purple-200 transition-colors">
+                     {theme.description}
+                   </p>
+                 </div>
+               ))}
+             </div>
+             {isFree && <PremiumLockOverlay />}
+           </section>
+
+           {/* Archetypes */}
+           <section className="relative">
+             <h3 className="text-lg font-serif font-bold text-slate-900 mb-6 flex items-center gap-2">
+               <Crown className="w-5 h-5 text-amber-600" />
+               Archetypal Patterns
+             </h3>
              <div className="grid md:grid-cols-2 gap-4">
-                {data.archetypes.map((arch, i) => (
-                    <div key={i} className={`p-5 rounded-xl bg-neutral-800/50 border border-white/5 ${isFree ? 'blur-sm select-none opacity-50' : ''}`}>
-                        <h4 className="text-lg font-semibold text-amber-200 mb-2">{arch.name}</h4>
-                        <p className="text-neutral-400">{arch.explanation}</p>
-                    </div>
-                ))}
+               {data.archetypes.map((arch, i) => (
+                 <div key={i} className={`bg-amber-50/50 p-4 rounded-lg border border-amber-100 ${isFree ? 'blur-sm select-none opacity-40' : ''}`}>
+                   <h4 className="text-sm font-bold text-amber-900 mb-2">{arch.name}</h4>
+                   <p className="text-xs text-amber-800/80 leading-relaxed">{arch.explanation}</p>
+                 </div>
+               ))}
              </div>
-             {isFree && (
-                <div className="absolute inset-0 flex items-center justify-center z-10">
-                     {/* Reuse unlock prompt or just rely on the first one if they overlap in view, but separate sections is better */}
-                </div>
-            )}
-        </section>
+             {isFree && <PremiumLockOverlay />}
+           </section>
 
-        {/* Actionable Advice - PREMIUM */}
-        <section className="relative bg-gradient-to-br from-purple-900/20 to-blue-900/20 p-8 rounded-3xl border border-white/10 overflow-hidden">
-             <div className="relative z-10">
-                <h3 className="text-xs font-bold tracking-widest text-white/60 uppercase mb-4">Weekly Action Item</h3>
-                <div className={isFree ? 'blur-md select-none opacity-50' : ''}>
-                    <p className="text-2xl font-serif italic text-white mb-6">&quot;{data.advice}&quot;</p>
-                    <div className="bg-white/10 p-4 rounded-xl inline-block">
-                        <p className="text-sm text-purple-200 font-semibold">Reflection Question</p>
-                        <p className="text-white mt-1">{data.reflection_question}</p>
-                    </div>
+           {/* Action & Advice */}
+           <section className="relative">
+              <div className={`bg-slate-900 text-white p-8 rounded-xl shadow-xl ${isFree ? 'blur-sm select-none opacity-40' : ''}`}>
+                <Quote className="w-8 h-8 text-blue-400 mb-4 opacity-50" />
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6">Integration Practice</h3>
+                
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-lg font-serif font-bold text-white mb-2">Action Item</h4>
+                    <p className="text-slate-300 leading-relaxed">{data.advice}</p>
+                  </div>
+                  
+                  <div className="pt-6 border-t border-white/10">
+                    <h4 className="text-sm font-bold text-blue-300 mb-2">Reflection Question</h4>
+                    <p className="text-lg text-white italic font-serif">
+                      &ldquo;{data.reflection_question}&rdquo;
+                    </p>
+                  </div>
                 </div>
-             </div>
-             
-             {isFree && (
-                <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/40 backdrop-blur-[2px]">
-                    <UnlockPrompt />
-                </div>
-            )}
-        </section>
+              </div>
+              {isFree && <PremiumLockOverlay dark />}
+           </section>
+        </div>
       </div>
     </motion.div>
   );
 }
 
-function UnlockPrompt() {
-    return (
-        <div className="text-center p-6 bg-black/80 border border-purple-500/50 rounded-2xl shadow-2xl backdrop-blur-xl max-w-sm">
-            <Lock className="w-8 h-8 text-purple-400 mx-auto mb-4" />
-            <h4 className="text-xl font-bold text-white mb-2">Unlock Deep Insights</h4>
-            <p className="text-neutral-400 text-sm mb-6">
-                Upgrade to Deep Plan to reveal Archetypes, Actionable Advice, and Hidden Themes.
-            </p>
-            <Link href="/settings" className="inline-block px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-full font-medium transition-colors">
-                Upgrade Now
-            </Link>
-        </div>
-    );
+function PremiumLockOverlay({ dark = false }: { dark?: boolean }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center z-10">
+       <div className={`${dark ? 'bg-slate-800/90 border-slate-700' : 'bg-white/90 border-slate-200'} p-6 rounded-xl border shadow-lg backdrop-blur-sm text-center max-w-xs`}>
+         <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+           <Lock className="w-5 h-5 text-amber-600" />
+         </div>
+         <h4 className={`text-sm font-bold ${dark ? 'text-white' : 'text-slate-900'} mb-1`}>Premium Analysis</h4>
+         <p className={`text-xs ${dark ? 'text-slate-400' : 'text-slate-500'} mb-4`}>
+           Unlock archetypes, hidden themes, and actionable advice.
+         </p>
+         <Link href="/settings" className="block w-full py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition-colors">
+           Upgrade to Unlock
+         </Link>
+       </div>
+    </div>
+  );
 }
-

@@ -9,6 +9,9 @@ export type PlanType = typeof PLANS[keyof typeof PLANS];
 // Free user analysis limit (lifetime)
 export const FREE_ANALYSIS_LIMIT = 20;
 
+// Free user weekly report limit (lifetime)
+export const FREE_WEEKLY_REPORT_LIMIT = 3;
+
 // User Roles
 export const ROLES = {
   USER: 'USER',
