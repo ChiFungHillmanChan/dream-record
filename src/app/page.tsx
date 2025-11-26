@@ -155,29 +155,45 @@ export default function DreamJournal() {
   // Constants
   const ALL_PRESET_TAGS = ['開心','可怕','感動','親情','離世','奇幻','追逐','飛翔','戀愛','工作','考試','清醒夢','噩夢','搞笑'];
   
-  // Load Data & set today's date on client
-  useEffect(() => {
-    loadDreams();
-    loadCurrentUser();
-    setTodayStr(new Date().toLocaleDateString());
-    
-    // Load tags
-    const savedTags = localStorage.getItem('user_custom_tags');
-    if (savedTags) {
-        try {
-            setAvailableTags(JSON.parse(savedTags));
-        } catch {
-            setAvailableTags(['開心', '可怕', '親情', '奇幻', '戀愛']);
-        }
-    } else {
-        setAvailableTags(['開心', '可怕', '親情', '奇幻', '戀愛']);
-    }
-  }, []);
 
   const updateAvailableTags = (newTags: string[]) => {
       setAvailableTags(newTags);
       localStorage.setItem('user_custom_tags', JSON.stringify(newTags));
   };
+
+  // Load Data & set today's date on client
+  useEffect(() => {
+    const loadInitialData = async () => {
+      const todayDate = new Date().toISOString().split('T')[0];
+      const [dreamsData, reportsData, noDreamToday, user, remaining] = await Promise.all([
+        getDreams(),
+        getWeeklyReports(),
+        hasNoDreamForDate(todayDate),
+        getCurrentUser(),
+        getRemainingFreeAnalyses()
+      ]);
+      setDreams(dreamsData);
+      setWeeklyReports(reportsData);
+      setHasNoDreamToday(noDreamToday);
+      setCurrentUser(user);
+      setRemainingAnalyses(remaining);
+      setTodayStr(new Date().toLocaleDateString());
+      
+      // Load tags from localStorage
+      const savedTags = localStorage.getItem('user_custom_tags');
+      if (savedTags) {
+          try {
+              setAvailableTags(JSON.parse(savedTags));
+          } catch {
+              setAvailableTags(['開心', '可怕', '親情', '奇幻', '戀愛']);
+          }
+      } else {
+          setAvailableTags(['開心', '可怕', '親情', '奇幻', '戀愛']);
+      }
+    };
+    
+    loadInitialData();
+  }, []);
 
   const loadCurrentUser = async () => {
     const [user, remaining] = await Promise.all([
@@ -542,13 +558,13 @@ export default function DreamJournal() {
                     onClick={e => e.stopPropagation()}
                 >
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-white">管理常用標籤</h3>
+                        <h3 className="text-lg font-bold text-white">編織常用印記</h3>
                         <button onClick={() => setShowTagManager(false)} className="text-[var(--muted)] hover:text-white"><X size={20}/></button>
                     </div>
                     
                     <div className="space-y-6">
                         <div>
-                            <label className="text-xs text-[var(--muted)] mb-2 block">我的標籤 (點擊移除)</label>
+                            <label className="text-xs text-[var(--muted)] mb-2 block">已鐫刻印記 (點擊抹去)</label>
                             <div className="flex flex-wrap gap-2">
                                 {availableTags.map(tag => (
                                     <button
@@ -564,7 +580,7 @@ export default function DreamJournal() {
                         </div>
 
                         <div>
-                            <label className="text-xs text-[var(--muted)] mb-2 block">推薦標籤 (點擊加入)</label>
+                            <label className="text-xs text-[var(--muted)] mb-2 block">共鳴印記 (點擊鐫刻)</label>
                             <div className="flex flex-wrap gap-2">
                                 {ALL_PRESET_TAGS.filter(t => !availableTags.includes(t)).map(tag => (
                                     <button
@@ -579,12 +595,12 @@ export default function DreamJournal() {
                         </div>
 
                         <div>
-                            <label className="text-xs text-[var(--muted)] mb-2 block">新增自訂標籤</label>
+                            <label className="text-xs text-[var(--muted)] mb-2 block">鐫刻新印記</label>
                             <div className="flex gap-2">
                                 <input 
                                     type="text" 
                                     id="new-tag-input"
-                                    placeholder="輸入標籤名稱..."
+                                    placeholder="賦予印記之名..."
                                     className="flex-1 px-3 py-2 rounded-xl bg-[#0f1230] border border-[var(--border)] text-sm"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
@@ -607,7 +623,7 @@ export default function DreamJournal() {
                                     }}
                                     className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-bold"
                                 >
-                                    加入
+                                    鐫刻
                                 </button>
                             </div>
                         </div>
@@ -753,8 +769,8 @@ export default function DreamJournal() {
 
               <div>
                 <h3 className="text-sm font-semibold text-[#eaeaff] mb-2 flex justify-between items-center">
-                    標籤
-                    <button onClick={() => setShowTagManager(true)} className="text-xs text-[var(--accent)] hover:text-white transition-colors">管理</button>
+                    夢境印記
+                    <button onClick={() => setShowTagManager(true)} className="text-xs text-[var(--accent)] hover:text-white transition-colors">編織</button>
                 </h3>
                 <div className="flex flex-wrap gap-2 mb-3">
                     {availableTags.map(tag => (
@@ -795,7 +811,7 @@ export default function DreamJournal() {
                         type="text" 
                         value={customTagInput}
                         onChange={(e) => setCustomTagInput(e.target.value)}
-                        placeholder="＋ 自訂標籤"
+                        placeholder="＋ 鐫刻新印記"
                         className="flex-1 px-3 py-2 rounded-xl bg-[#0f1230] border border-[var(--border)] text-sm"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && customTagInput.trim()) {
@@ -813,7 +829,7 @@ export default function DreamJournal() {
                         }}
                         className="px-3 py-2 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)]"
                     >
-                        加入
+                        鐫刻
                     </button>
                 </div>
 
@@ -901,11 +917,16 @@ export default function DreamJournal() {
                 </div>
                 <div className="flex items-center gap-2 flex-1 justify-end">
                     <button onClick={() => {
-                        const d = new Date(currentDate);
-                        if (calendarMode === 'month') d.setMonth(d.getMonth() - 1);
-                        else if (calendarMode === 'week') d.setDate(d.getDate() - 7);
-                        else d.setDate(d.getDate() - 1);
-                        setCurrentDate(d);
+                        if (calendarMode === 'day') {
+                            const d = new Date(selectedDateStr);
+                            d.setDate(d.getDate() - 1);
+                            setSelectedDateStr(d.toISOString().split('T')[0]);
+                        } else {
+                            const d = new Date(currentDate);
+                            if (calendarMode === 'month') d.setMonth(d.getMonth() - 1);
+                            else if (calendarMode === 'week') d.setDate(d.getDate() - 7);
+                            setCurrentDate(d);
+                        }
                     }} className="p-2 rounded-lg bg-[#0f1230] border border-[var(--border)]"><ChevronLeft size={14}/></button>
                     <span className="font-bold min-w-[100px] text-center">
                         {calendarMode === 'month' && `${currentDate.getFullYear()} 年 ${currentDate.getMonth() + 1} 月`}
@@ -918,11 +939,16 @@ export default function DreamJournal() {
                         {calendarMode === 'day' && selectedDateStr}
                     </span>
                     <button onClick={() => {
-                        const d = new Date(currentDate);
-                        if (calendarMode === 'month') d.setMonth(d.getMonth() + 1);
-                        else if (calendarMode === 'week') d.setDate(d.getDate() + 7);
-                        else d.setDate(d.getDate() + 1);
-                        setCurrentDate(d);
+                        if (calendarMode === 'day') {
+                            const d = new Date(selectedDateStr);
+                            d.setDate(d.getDate() + 1);
+                            setSelectedDateStr(d.toISOString().split('T')[0]);
+                        } else {
+                            const d = new Date(currentDate);
+                            if (calendarMode === 'month') d.setMonth(d.getMonth() + 1);
+                            else if (calendarMode === 'week') d.setDate(d.getDate() + 7);
+                            setCurrentDate(d);
+                        }
                     }} className="p-2 rounded-lg bg-[#0f1230] border border-[var(--border)]"><ChevronRight size={14}/></button>
                 </div>
              </div>
