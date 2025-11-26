@@ -8,14 +8,19 @@ import { revalidatePath } from 'next/cache';
 export async function register(prevState: unknown, formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
+  const confirmPassword = formData.get('confirmPassword') as string;
   const name = formData.get('name') as string;
 
   if (!email || !password || !name) {
-    return { error: 'All fields are required' };
+    return { error: '所有欄位皆為必填' };
   }
 
   if (password.length < 6) {
-    return { error: 'Password must be at least 6 characters' };
+    return { error: '密碼長度至少需為 6 個字元' };
+  }
+
+  if (password !== confirmPassword) {
+    return { error: '兩次輸入的密碼不相符' };
   }
 
   try {
@@ -24,7 +29,7 @@ export async function register(prevState: unknown, formData: FormData) {
     });
 
     if (existingUser) {
-      return { error: 'Email already registered' };
+      return { error: '此電郵已被註冊' };
     }
 
     const hashedPassword = await hashPassword(password);
@@ -46,7 +51,7 @@ export async function register(prevState: unknown, formData: FormData) {
     
   } catch (error) {
     console.error('Registration error:', error);
-    return { error: 'Something went wrong. Please try again.' };
+    return { error: '發生錯誤，請稍後再試' };
   }
   
   redirect('/');
@@ -57,7 +62,7 @@ export async function login(prevState: unknown, formData: FormData) {
   const password = formData.get('password') as string;
 
   if (!email || !password) {
-    return { error: 'Email and password are required' };
+    return { error: '請輸入電郵和密碼' };
   }
 
   try {
@@ -66,13 +71,13 @@ export async function login(prevState: unknown, formData: FormData) {
     });
 
     if (!user) {
-      return { error: 'Invalid email or password' };
+      return { error: '電郵或密碼錯誤' };
     }
 
     const isValid = await verifyPassword(password, user.password);
 
     if (!isValid) {
-      return { error: 'Invalid email or password' };
+      return { error: '電郵或密碼錯誤' };
     }
 
     await setSession({ 
@@ -84,7 +89,7 @@ export async function login(prevState: unknown, formData: FormData) {
 
   } catch (error) {
     console.error('Login error:', error);
-    return { error: 'Something went wrong. Please try again.' };
+    return { error: '發生錯誤，請稍後再試' };
   }
 
   redirect('/');

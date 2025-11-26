@@ -82,6 +82,21 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-300 ml-1">確認密碼</label>
+            <div className="relative group">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
+              <input
+                name="confirmPassword"
+                type="password"
+                required
+                placeholder="再次輸入密碼"
+                minLength={6}
+                className="w-full bg-black/20 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-gray-500 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all"
+              />
+            </div>
+          </div>
+
           {state?.error && (
             <motion.div 
               initial={{ opacity: 0, height: 0 }}

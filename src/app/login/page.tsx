@@ -1,10 +1,10 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { login } from '../actions/auth';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Moon, Lock, Mail, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Moon, Lock, Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 const initialState = {
   error: '',
@@ -12,6 +12,7 @@ const initialState = {
 
 export default function LoginPage() {
   const [state, formAction, isPending] = useActionState(login, initialState);
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -59,11 +60,28 @@ export default function LoginPage() {
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
               <input
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 placeholder="••••••••"
-                className="w-full bg-black/20 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-gray-500 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all"
+                className="w-full bg-black/20 border border-white/10 rounded-xl py-3 pl-10 pr-12 text-white placeholder:text-gray-500 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1 z-10 focus:outline-none"
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={showPassword ? "visible" : "hidden"}
+                    initial={{ opacity: 0, rotate: -90, scale: 0.5 }}
+                    animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                    exit={{ opacity: 0, rotate: 90, scale: 0.5 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </motion.div>
+                </AnimatePresence>
+              </button>
             </div>
           </div>
 
@@ -104,4 +122,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
