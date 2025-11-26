@@ -32,15 +32,15 @@ export default function LoginPage() {
         </div>
 
         <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-          Welcome Back
+          歡迎回來
         </h1>
         <p className="text-center text-muted mb-8">
-          Enter your dream world
+          進入你的夢境世界
         </p>
 
         <form action={formAction} className="space-y-6">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300 ml-1">Email</label>
+            <label className="text-sm font-medium text-gray-300 ml-1">電郵地址</label>
             <div className="relative group">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
               <input
@@ -54,7 +54,7 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300 ml-1">Password</label>
+            <label className="text-sm font-medium text-gray-300 ml-1">密碼</label>
             <div className="relative group">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
               <input
@@ -85,7 +85,7 @@ export default function LoginPage() {
               <span className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                Sign In
+                登入
                 <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </>
             )}
@@ -94,9 +94,9 @@ export default function LoginPage() {
 
         <div className="mt-8 text-center">
           <p className="text-muted text-sm">
-            Don't have an account?{' '}
+            還沒有帳號？{' '}
             <Link href="/register" className="text-accent hover:text-accent/80 transition-colors font-medium">
-              Create one
+              立即註冊
             </Link>
           </p>
         </div>

@@ -32,29 +32,29 @@ export default function RegisterPage() {
         </div>
 
         <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-          Start Dreaming
+          開始做夢
         </h1>
         <p className="text-center text-muted mb-8">
-          Create your account to record your journey
+          建立帳戶，記錄你的夢境旅程
         </p>
 
         <form action={formAction} className="space-y-6">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300 ml-1">Full Name</label>
+            <label className="text-sm font-medium text-gray-300 ml-1">全名</label>
             <div className="relative group">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
               <input
                 name="name"
                 type="text"
                 required
-                placeholder="Dreamer Name"
+                placeholder="你的名字"
                 className="w-full bg-black/20 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-gray-500 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300 ml-1">Email</label>
+            <label className="text-sm font-medium text-gray-300 ml-1">電郵地址</label>
             <div className="relative group">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
               <input
@@ -68,7 +68,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300 ml-1">Password</label>
+            <label className="text-sm font-medium text-gray-300 ml-1">密碼</label>
             <div className="relative group">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
               <input
@@ -100,7 +100,7 @@ export default function RegisterPage() {
               <span className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                Create Account
+                建立帳戶
                 <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </>
             )}
@@ -109,9 +109,9 @@ export default function RegisterPage() {
 
         <div className="mt-8 text-center">
           <p className="text-muted text-sm">
-            Already have an account?{' '}
+            已經有帳戶？{' '}
             <Link href="/login" className="text-accent hover:text-accent/80 transition-colors font-medium">
-              Sign in
+              登入
             </Link>
           </p>
         </div>

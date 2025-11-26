@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Crown, Shield, ArrowLeft, Search, 
   Calendar, Mail, User as UserIcon, Sparkles,
-  DollarSign, X, Check
+  X, Check
 } from 'lucide-react';
 import Link from 'next/link';
 import { PLANS, PLAN_PRICING, PLAN_FEATURES, ROLES } from '@/lib/constants';
@@ -51,7 +51,7 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
       }));
       setSelectedUser(null);
     } else {
-      alert(result.error ?? 'Failed to update plan');
+      alert(result.error ?? '更新計劃失敗');
     }
     setIsUpdating(false);
   };
@@ -63,7 +63,7 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
     if (result.success) {
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
     } else {
-      alert(result.error ?? 'Failed to update role');
+      alert(result.error ?? '更新角色失敗');
     }
     setIsUpdating(false);
   };

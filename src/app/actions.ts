@@ -1,12 +1,12 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { Dream } from '@prisma/client';
+import { Dream, WeeklyReport } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { getOpenAI } from '@/app/services/openai';
 import { loadPromptFile } from '@/app/services/load-prompts';
 import { getSession } from '@/lib/auth';
-import { ROLES } from '@/lib/constants';
+import { PLANS } from '@/lib/constants';
 
 // User info type for header display
 export type CurrentUserInfo = {
@@ -42,24 +42,53 @@ export type DreamData = {
   date: string;
   tags: string[];
   id?: string;
+  analysis?: string;
 };
 
 export type DreamAnalysisResult = {
-  analysis: string;
+  analysis: string | null;
   vibe: string;
-  reflection: string;
+  reflection: string | null;
   summary: string;
 };
+
+function redactAnalysis(jsonStr: string | null): string | null {
+  if (!jsonStr) return null;
+  try {
+    const data = JSON.parse(jsonStr);
+    return JSON.stringify({
+      ...data,
+      analysis: null,
+      reflection: null
+    });
+  } catch {
+    return jsonStr;
+  }
+}
 
 export async function getDreams(): Promise<Dream[]> {
   try {
     const session = await getSession();
     if (!session?.userId) return [];
 
-    return await prisma.dream.findMany({
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId as string },
+      select: { plan: true }
+    });
+
+    const dreams = await prisma.dream.findMany({
       where: { userId: session.userId as string },
       orderBy: { createdAt: 'desc' },
     });
+
+    if (user?.plan === PLANS.FREE) {
+      return dreams.map(d => ({
+        ...d,
+        analysis: redactAnalysis(d.analysis)
+      }));
+    }
+
+    return dreams;
   } catch (error) {
     console.error("Error fetching dreams:", error);
     return [];
@@ -71,7 +100,7 @@ export async function saveDream(data: DreamData): Promise<{ success: boolean; er
     const session = await getSession();
     if (!session?.userId) return { success: false, error: 'Not authenticated' };
 
-    const { id, tags, ...rest } = data;
+    const { id, tags, analysis, ...rest } = data;
     const tagsJson = JSON.stringify(tags);
 
     if (id) {
@@ -86,6 +115,7 @@ export async function saveDream(data: DreamData): Promise<{ success: boolean; er
         data: {
           ...rest,
           tags: tagsJson,
+          ...(analysis !== undefined && { analysis }),
         },
       });
     } else {
@@ -93,6 +123,7 @@ export async function saveDream(data: DreamData): Promise<{ success: boolean; er
         data: {
           ...rest,
           tags: tagsJson,
+          analysis: analysis || null,
           userId: session.userId as string,
         },
       });
@@ -125,15 +156,61 @@ export async function deleteDream(id: string): Promise<{ success: boolean }> {
   }
 }
 
-export async function analyzeDream(content: string): Promise<DreamAnalysisResult | null> {
+export async function analyzeDream(content: string): Promise<{ result: DreamAnalysisResult | null; error?: string }> {
+  const session = await getSession();
+  if (!session?.userId) return { result: null, error: '請先登入' };
+
+  const user = await prisma.user.findUnique({
+      where: { id: session.userId as string },
+      select: { 
+        plan: true,
+        dailyAnalysisCount: true,
+        lastAnalysisDate: true,
+        id: true
+      }
+  });
+
+  if (!user) return { result: null, error: '找不到用戶' };
+
+  // Check Daily Limits
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const lastDate = new Date(user.lastAnalysisDate);
+  lastDate.setHours(0, 0, 0, 0);
+
+  let currentCount = user.dailyAnalysisCount;
+
+  // Reset count if it's a new day
+  if (lastDate < today) {
+    currentCount = 0;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { 
+        dailyAnalysisCount: 0,
+        lastAnalysisDate: new Date()
+      }
+    });
+  }
+
+  // Limit Check
+  const limit = user.plan === PLANS.DEEP ? 10 : 1;
+  if (currentCount >= limit) {
+    return { 
+      result: null, 
+      error: user.plan === PLANS.DEEP 
+        ? '您今天的生成次數已達上限（10次）。' 
+        : '免費版每天只能生成一次。升級解鎖更多次數！' 
+    };
+  }
+
   const openai = getOpenAI();
-  if (!openai) return null;
+  if (!openai) return { result: null, error: 'AI 服務暫時無法使用' };
 
   try {
     const promptText = await loadPromptFile('dream-analysis.txt');
     
     const response = await openai.responses.create({
-      model: 'gpt-4.1',
+      model: 'gpt-5.1',
       input: [
         {
           type: 'message',
@@ -147,6 +224,7 @@ export async function analyzeDream(content: string): Promise<DreamAnalysisResult
         }
       ],
       text: {
+        verbosity: 'medium',
         format: {
           type: 'json_schema',
           name: 'dream_analysis',
@@ -163,6 +241,9 @@ export async function analyzeDream(content: string): Promise<DreamAnalysisResult
           },
           strict: true
         }
+      },
+      reasoning: {
+        effort: 'medium'
       }
     });
 
@@ -171,13 +252,232 @@ export async function analyzeDream(content: string): Promise<DreamAnalysisResult
         const textContent = outputMessage?.content?.find(item => item.type === 'output_text')?.text;
         if (textContent) {
             const result = JSON.parse(textContent);
-            return result;
+            
+            // Increment count
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { 
+                dailyAnalysisCount: { increment: 1 },
+                lastAnalysisDate: new Date()
+              }
+            });
+
+            if (user.plan === PLANS.FREE) {
+                return {
+                    result: {
+                      ...result,
+                      analysis: null,
+                      reflection: null
+                    }
+                };
+            }
+            
+            return { result };
         }
     }
-    return null;
+    return { result: null, error: 'AI 分析失敗，請稍後再試' };
 
   } catch (error) {
     console.error("AI Analysis failed:", error);
-    return null;
+    return { result: null, error: '系統發生錯誤' };
   }
+}
+
+export type WeeklyReportData = {
+  word_of_the_week: string;
+  summary: string;
+  themes: { name: string; description: string }[];
+  emotional_trajectory: string;
+  day_residue_analysis: string;
+  archetypes: { name: string; explanation: string }[];
+  deep_insight: string;
+  advice: string;
+  reflection_question: string;
+  image_prompt: string;
+};
+
+export async function generateWeeklyReport(): Promise<{ success: boolean; error?: string }> {
+  const session = await getSession();
+  if (!session?.userId) return { success: false, error: '請先登入' };
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId as string },
+    select: { id: true, plan: true }
+  });
+
+  if (!user) return { success: false, error: '找不到用戶' };
+
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - 7);
+
+  // Get dreams
+  const dreams = await prisma.dream.findMany({
+    where: {
+      userId: user.id,
+      createdAt: {
+        gte: startDate,
+        lte: endDate
+      }
+    },
+    orderBy: { createdAt: 'asc' }
+  });
+
+  if (dreams.length < 3) {
+     return { success: false, error: '過去 7 天的夢境記錄太少，無法生成週報 (至少需要 3 個夢)' };
+  }
+
+  const dreamsText = dreams.map(d => `[${d.date}]: ${d.content} (Tags: ${d.tags})`).join('\n');
+
+  const openai = getOpenAI();
+  if (!openai) return { success: false, error: 'AI 服務暫時無法使用' };
+
+  try {
+    const promptText = await loadPromptFile('weekly-dream-analysis.txt');
+    
+    // 1. Text Analysis
+    const response = await openai.responses.create({
+      model: 'gpt-5.1',
+      input: [
+        {
+          type: 'message',
+          role: 'system',
+          content: [{ type: 'input_text', text: promptText }]
+        },
+        {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: `Here are my dreams from the past week:\n${dreamsText}` }]
+        }
+      ],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'weekly_dream_analysis',
+          schema: {
+            type: 'object',
+            properties: {
+              word_of_the_week: { type: 'string' },
+              summary: { type: 'string' },
+              themes: { 
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string' },
+                        description: { type: 'string' }
+                    },
+                    required: ['name', 'description'],
+                    additionalProperties: false
+                }
+              },
+              emotional_trajectory: { type: 'string' },
+              day_residue_analysis: { type: 'string' },
+              archetypes: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string' },
+                        explanation: { type: 'string' }
+                    },
+                    required: ['name', 'explanation'],
+                    additionalProperties: false
+                }
+              },
+              deep_insight: { type: 'string' },
+              advice: { type: 'string' },
+              reflection_question: { type: 'string' },
+              image_prompt: { type: 'string' }
+            },
+            required: [
+              'word_of_the_week', 'summary', 'themes', 'emotional_trajectory', 
+              'day_residue_analysis', 'archetypes', 'deep_insight', 'advice', 
+              'reflection_question', 'image_prompt'
+            ],
+            additionalProperties: false
+          },
+          strict: true
+        }
+      },
+      reasoning: {
+        effort: 'high'
+      }
+    });
+
+    if (response.status !== 'completed') {
+         return { success: false, error: 'AI 分析失敗' };
+    }
+
+    const outputMessage = response.output.find(item => item.type === 'message');
+    const textContent = outputMessage?.content?.find(item => item.type === 'output_text')?.text;
+
+    if (!textContent) {
+        return { success: false, error: 'AI 未返回分析結果' };
+    }
+
+    const analysisData: WeeklyReportData = JSON.parse(textContent);
+    let imageBase64: string | null = null;
+
+    // 2. Image Generation (only if prompt exists and user is paid plan)
+    // Actually, user requirement: "for free user, only able to view a little. for paid, view full."
+    // We generate everything, but filter in view. But image might be expensive.
+    // For now, generate it.
+    
+    if (analysisData.image_prompt) {
+       try {
+          const imageResponse = await openai.responses.create({
+            model: 'gpt-5',
+            input: [
+                 {
+                  type: 'message',
+                  role: 'user',
+                  content: [
+                    { type: 'input_text', text: `Generate an abstract, surrealist collage representing this dream analysis: ${analysisData.image_prompt}` }
+                  ]
+                 }
+            ],
+            tools: [{ type: 'image_generation' }]
+          });
+          
+          const imageData = imageResponse.output
+            .filter((output) => output.type === "image_generation_call")
+            .map((output) => output.result);
+
+          if (imageData.length > 0) {
+            imageBase64 = imageData[0];
+          }
+       } catch (imgError) {
+           console.error("Image generation failed:", imgError);
+       }
+    }
+
+    // Save to DB
+    await prisma.weeklyReport.create({
+        data: {
+            userId: user.id,
+            startDate,
+            endDate,
+            analysis: JSON.stringify(analysisData),
+            imageBase64: imageBase64 || null
+        }
+    });
+
+    revalidatePath('/weekly-reports'); 
+    return { success: true };
+
+  } catch (error) {
+    console.error("Weekly Report Generation failed:", error);
+    return { success: false, error: '系統發生錯誤' };
+  }
+}
+
+export async function getWeeklyReports(): Promise<WeeklyReport[]> {
+  const session = await getSession();
+  if (!session?.userId) return [];
+
+  return await prisma.weeklyReport.findMany({
+    where: { userId: session.userId as string },
+    orderBy: { createdAt: 'desc' }
+  });
 }

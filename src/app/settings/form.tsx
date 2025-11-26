@@ -49,13 +49,17 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
   // Handle URL params for success/canceled
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
-      setShowSuccessMessage(true);
-      // Remove params from URL
-      window.history.replaceState({}, '', '/settings');
+      setTimeout(() => {
+        setShowSuccessMessage(true);
+        // Remove params from URL
+        window.history.replaceState({}, '', '/settings');
+      }, 0);
     }
     if (searchParams.get('canceled') === 'true') {
-      setCheckoutError('訂閱已取消');
-      window.history.replaceState({}, '', '/settings');
+      setTimeout(() => {
+        setCheckoutError('訂閱已取消');
+        window.history.replaceState({}, '', '/settings');
+      }, 0);
     }
   }, [searchParams]);
   
@@ -84,7 +88,7 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
     if (result.success && result.url) {
       window.location.href = result.url;
     } else {
-      setCheckoutError(result.error ?? 'Failed to open subscription management');
+      setCheckoutError(result.error ?? '無法開啟訂閱管理頁面');
       setIsCheckingOut(false);
     }
   };
@@ -100,7 +104,7 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
     if (result.success) {
       window.location.reload();
     } else {
-      setAdminSetupError(result.error ?? 'Failed to setup superadmin');
+      setAdminSetupError(result.error ?? '設定管理員失敗');
     }
     
     setIsSettingUpAdmin(false);
@@ -115,13 +119,13 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
             </Link>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             <SettingsIcon className="w-8 h-8 text-accent" />
-            Settings
+            設定
             </h1>
         </div>
         <form action={logout}>
             <button className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors px-4 py-2 rounded-lg hover:bg-red-500/10">
                 <LogOut className="w-5 h-5" />
-                Logout
+                登出
             </button>
         </form>
       </div>
@@ -357,26 +361,26 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
         transition={{ delay: 0.2 }}
         className="bg-surface/30 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-xl"
       >
-        <h2 className="text-xl font-semibold text-white mb-6 border-b border-white/10 pb-4">Account Information</h2>
+        <h2 className="text-xl font-semibold text-white mb-6 border-b border-white/10 pb-4">帳戶資訊</h2>
         
         <form action={formAction} className="space-y-6">
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300 ml-1">Full Name</label>
+              <label className="text-sm font-medium text-gray-300 ml-1">全名</label>
               <div className="relative group">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
                 <input
                   name="name"
                   type="text"
                   defaultValue={user.name || ''}
-                  placeholder="Your Name"
+                  placeholder="你的名字"
                   className="w-full bg-black/20 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-gray-500 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300 ml-1">Email</label>
+              <label className="text-sm font-medium text-gray-300 ml-1">電子郵件</label>
               <div className="relative group">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
                 <input
@@ -391,13 +395,13 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300 ml-1">New Password (optional)</label>
+            <label className="text-sm font-medium text-gray-300 ml-1">新密碼 (選填)</label>
             <div className="relative group">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-accent transition-colors" />
               <input
                 name="password"
                 type="password"
-                placeholder="Leave empty to keep current password"
+                placeholder="留空以保留目前密碼"
                 minLength={6}
                 className="w-full bg-black/20 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-gray-500 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all"
               />
@@ -426,7 +430,7 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  Save Changes
+                  儲存變更
                 </>
               )}
             </button>
@@ -434,18 +438,18 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
         </form>
 
         <div className="mt-12 pt-8 border-t border-white/10">
-          <h3 className="text-lg font-semibold text-red-400 mb-4">Danger Zone</h3>
+          <h3 className="text-lg font-semibold text-red-400 mb-4">危險區域</h3>
           <div className="flex items-center justify-between p-4 bg-red-500/5 border border-red-500/10 rounded-xl">
             <div>
-              <p className="text-white font-medium">Delete Account</p>
-              <p className="text-sm text-gray-400">Once you delete your account, there is no going back. Please be certain.</p>
+              <p className="text-white font-medium">刪除帳號</p>
+              <p className="text-sm text-gray-400">一旦你刪除帳號，將無法復原。請確定要執行此操作。</p>
             </div>
             <form action={deleteAction}>
                 <button 
                     disabled={isDeletePending}
                     className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
                     onClick={(e) => {
-                        if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+                        if (!confirm('你確定要刪除帳號嗎？此操作無法復原。')) {
                             e.preventDefault();
                         }
                     }}
@@ -455,7 +459,7 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
                     ) : (
                         <>
                          <Trash2 className="w-4 h-4" />
-                         Delete Account
+                         刪除帳號
                         </>
                     )}
                 </button>

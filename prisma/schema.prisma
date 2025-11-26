@@ -15,9 +15,12 @@ model User {
   role          String    @default("USER") // USER or SUPERADMIN
   plan          String    @default("FREE") // FREE or DEEP
   planExpiresAt DateTime? // When the paid plan expires (null for FREE plan)
+  dailyAnalysisCount Int      @default(0)
+  lastAnalysisDate   DateTime @default(now())
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   dreams        Dream[]
+  weeklyReports WeeklyReport[]
 }
 
 model Dream {
@@ -33,4 +36,17 @@ model Dream {
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([date])
+}
+
+model WeeklyReport {
+  id          String   @id @default(cuid())
+  userId      String
+  startDate   DateTime
+  endDate     DateTime
+  analysis    String   // JSON content
+  imageBase64 String?  // Base64 string of the generated image
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
 }

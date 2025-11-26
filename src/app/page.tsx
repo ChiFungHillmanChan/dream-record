@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Mic, RotateCcw, Search, Trash2, Edit2, 
   ChevronLeft, ChevronRight,
-  Download, Upload, Settings, Shield, Crown
+  Download, Upload, Settings, Shield, Crown, Lock, Sparkles
 } from 'lucide-react';
 import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo } from '@/app/actions';
 import { ROLES, PLANS } from '@/lib/constants';
@@ -216,6 +216,7 @@ export default function DreamJournal() {
       type,
       date: dateStr,
       tags: Array.from(selectedTags),
+      analysis: analysisResult ? JSON.stringify(analysisResult) : undefined,
     };
 
     const res = await saveDream(data);
@@ -251,7 +252,12 @@ export default function DreamJournal() {
   const handleAnalyze = async () => {
     if (!dreamText) return;
     setIsAnalyzing(true);
-    const result = await analyzeDream(dreamText);
+    const { result, error } = await analyzeDream(dreamText);
+    if (error) {
+        alert(error);
+        setIsAnalyzing(false);
+        return;
+    }
     setAnalysisResult(result);
     setIsAnalyzing(false);
   };
@@ -368,8 +374,8 @@ export default function DreamJournal() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-radial from-white via-[#d9d9ff] to-[var(--accent)] shadow-[0_0_12px_rgba(167,139,250,0.5)]" />
           <div>
-            <div className="font-bold text-base">今天：{todayStr || '載入中...'}</div>
-            <div className="text-xs text-[var(--muted)]">醒來就記下夢的碎片吧</div>
+            <div className="font-bold text-base">Dream Record</div>
+            <div className="text-xs text-[var(--muted)]">{todayStr || '載入中...'} · 醒來就記下夢的碎片吧</div>
           </div>
         </div>
         
@@ -398,6 +404,9 @@ export default function DreamJournal() {
                 <Shield size={20} />
               </Link>
             )}
+            <Link href="/weekly-reports" className="p-2 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] hover:bg-white/5 transition-colors text-[var(--muted)] hover:text-white" title="週報">
+                <Sparkles size={20} />
+            </Link>
             <Link href="/settings" className="p-2 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] hover:bg-white/5 transition-colors text-[var(--muted)] hover:text-white">
                 <Settings size={20} />
             </Link>
@@ -479,9 +488,26 @@ export default function DreamJournal() {
                     <div className="mt-2 p-4 rounded-xl bg-[var(--surface-soft)] border border-[var(--accent)]/30 text-sm space-y-2">
                         <div className="font-bold text-[var(--accent2)]">✨ 夢境解析</div>
                         <p><strong>摘要：</strong>{analysisResult.summary}</p>
-                        <p><strong>分析：</strong>{analysisResult.analysis}</p>
                         <p><strong>氛圍：</strong>{analysisResult.vibe}</p>
-                        <p><strong>建議：</strong>{analysisResult.reflection}</p>
+                        {analysisResult.analysis ? (
+                            <>
+                                <p><strong>分析：</strong>{analysisResult.analysis}</p>
+                                <p><strong>建議：</strong>{analysisResult.reflection}</p>
+                            </>
+                        ) : (
+                            <Link href="/settings" className="block mt-3 p-3 rounded-lg bg-black/20 border border-white/5 relative overflow-hidden group">
+                                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-[2px]" />
+                                <div className="relative flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-[var(--muted)]">
+                                        <Lock size={14} />
+                                        <span className="font-medium">深度分析與建議已上鎖</span>
+                                    </div>
+                                    <div className="text-xs bg-[var(--accent)] text-white px-2 py-1 rounded-lg shadow-lg group-hover:scale-105 transition-transform">
+                                        升級解鎖
+                                    </div>
+                                </div>
+                            </Link>
+                        )}
                     </div>
                  )}
               </div>
@@ -689,12 +715,31 @@ export default function DreamJournal() {
                                 </div>
                             </div>
                             <div className="whitespace-pre-wrap mb-3">{dream.content}</div>
-                            {dream.analysis && (
-                                <div className="mb-3 p-3 bg-[var(--surface)] rounded-lg text-xs border border-white/5">
-                                    <span className="text-[var(--accent2)] font-bold">AI 分析：</span>
-                                    {JSON.parse(dream.analysis).summary}
-                                </div>
-                            )}
+                            {dream.analysis && (() => {
+                                try {
+                                    const analysis = JSON.parse(dream.analysis);
+                                    return (
+                                        <div className="mb-3 p-3 bg-[var(--surface)] rounded-lg text-xs border border-white/5 space-y-1">
+                                            <div className="text-[var(--accent2)] font-bold mb-1">AI 分析報告</div>
+                                            <p><span className="opacity-70">摘要：</span>{analysis.summary}</p>
+                                            <p><span className="opacity-70">氛圍：</span>{analysis.vibe}</p>
+                                            
+                                            {analysis.analysis ? (
+                                                <div className="pt-2 mt-2 border-t border-white/5">
+                                                    <p className="mb-1"><span className="opacity-70">深度解析：</span>{analysis.analysis}</p>
+                                                    <p><span className="opacity-70">建議：</span>{analysis.reflection}</p>
+                                                </div>
+                                            ) : (
+                                                <Link href="/settings" className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5 text-[var(--muted)] hover:text-white transition-colors group">
+                                                    <Lock size={12} />
+                                                    <span>解鎖深度解析</span>
+                                                    <span className="text-[10px] bg-[var(--accent)] text-white px-1.5 py-0.5 rounded ml-auto opacity-0 group-hover:opacity-100 transition-opacity">Upgrade</span>
+                                                </Link>
+                                            )}
+                                        </div>
+                                    );
+                                } catch { return null; }
+                            })()}
                             <div className="flex flex-wrap gap-1">
                                 {(() => {
                                     try {
