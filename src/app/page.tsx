@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Mic, RotateCcw, Search, Trash2, Edit2, 
   ChevronLeft, ChevronRight,
-  Download, Upload, Settings, Shield, Crown, Sparkles
+  Settings, Shield, Crown, Sparkles, Plus, X
 } from 'lucide-react';
 import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo, getRemainingFreeAnalyses, getWeeklyReports, WeeklyReportData, hasNoDreamForDate } from '@/app/actions';
 import { ROLES, PLANS } from '@/lib/constants';
@@ -145,19 +145,39 @@ export default function DreamJournal() {
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(new Date().toISOString().split('T')[0]);
-  const importRef = useRef<HTMLInputElement>(null);
   const [todayStr, setTodayStr] = useState('');
   const [hasNoDreamToday, setHasNoDreamToday] = useState(false);
 
+  // Tag Management State
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [showTagManager, setShowTagManager] = useState(false);
+
   // Constants
-  const defaultTags = ['開心','可怕','感動','親情','離世','奇幻','追逐','飛翔','戀愛','工作','考試','清醒夢','噩夢','搞笑'];
+  const ALL_PRESET_TAGS = ['開心','可怕','感動','親情','離世','奇幻','追逐','飛翔','戀愛','工作','考試','清醒夢','噩夢','搞笑'];
   
   // Load Data & set today's date on client
   useEffect(() => {
     loadDreams();
     loadCurrentUser();
     setTodayStr(new Date().toLocaleDateString());
+    
+    // Load tags
+    const savedTags = localStorage.getItem('user_custom_tags');
+    if (savedTags) {
+        try {
+            setAvailableTags(JSON.parse(savedTags));
+        } catch {
+            setAvailableTags(['開心', '可怕', '親情', '奇幻', '戀愛']);
+        }
+    } else {
+        setAvailableTags(['開心', '可怕', '親情', '奇幻', '戀愛']);
+    }
   }, []);
+
+  const updateAvailableTags = (newTags: string[]) => {
+      setAvailableTags(newTags);
+      localStorage.setItem('user_custom_tags', JSON.stringify(newTags));
+  };
 
   const loadCurrentUser = async () => {
     const [user, remaining] = await Promise.all([
@@ -391,55 +411,6 @@ export default function DreamJournal() {
     loadCurrentUser(); // Reload to update remaining analyses count
   };
 
-  const handleExport = () => {
-      const data = {
-          version: 1,
-          exportedAt: new Date().toISOString(),
-          entries: dreams
-      };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'dream-journal-backup.json';
-      a.click();
-      URL.revokeObjectURL(url);
-  };
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-          try {
-              const data = JSON.parse(reader.result as string);
-              if (!Array.isArray(data.entries)) throw new Error('格式錯誤');
-              
-              if (!confirm('匯入將合併資料，是否繼續？')) return;
-
-              // Import simply by saving each entry
-              for (const entry of data.entries) {
-                  let tags = [];
-                  try { tags = typeof entry.tags === 'string' ? JSON.parse(entry.tags) : entry.tags; } catch {}
-                  
-                  await saveDream({
-                      id: entry.id,
-                      content: entry.content,
-                      type: entry.type,
-                      date: entry.date,
-                      tags: tags
-                  });
-              }
-              loadDreams();
-              alert('記憶匯入完成');
-          } catch (err) {
-              alert('記憶匯入失敗');
-              console.error(err);
-          }
-      };
-      reader.readAsText(file);
-  };
-
   // --- Views ---
 
   const renderStreakGrid = () => {
@@ -551,6 +522,98 @@ export default function DreamJournal() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Tag Manager Modal */}
+      <AnimatePresence>
+        {showTagManager && (
+             <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                onClick={() => setShowTagManager(false)}
+             >
+                <motion.div 
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 max-w-md w-full shadow-2xl"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-white">管理常用標籤</h3>
+                        <button onClick={() => setShowTagManager(false)} className="text-[var(--muted)] hover:text-white"><X size={20}/></button>
+                    </div>
+                    
+                    <div className="space-y-6">
+                        <div>
+                            <label className="text-xs text-[var(--muted)] mb-2 block">我的標籤 (點擊移除)</label>
+                            <div className="flex flex-wrap gap-2">
+                                {availableTags.map(tag => (
+                                    <button
+                                        key={tag}
+                                        onClick={() => updateAvailableTags(availableTags.filter(t => t !== tag))}
+                                        className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-200 border border-white/10 text-sm transition-all flex items-center gap-2 group"
+                                    >
+                                        {tag}
+                                        <X size={12} className="opacity-0 group-hover:opacity-100" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-xs text-[var(--muted)] mb-2 block">推薦標籤 (點擊加入)</label>
+                            <div className="flex flex-wrap gap-2">
+                                {ALL_PRESET_TAGS.filter(t => !availableTags.includes(t)).map(tag => (
+                                    <button
+                                        key={tag}
+                                        onClick={() => updateAvailableTags([...availableTags, tag])}
+                                        className="px-3 py-1.5 rounded-lg border border-dashed border-[var(--muted)] text-[var(--muted)] hover:bg-white/5 text-sm transition-all"
+                                    >
+                                        + {tag}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-xs text-[var(--muted)] mb-2 block">新增自訂標籤</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    id="new-tag-input"
+                                    placeholder="輸入標籤名稱..."
+                                    className="flex-1 px-3 py-2 rounded-xl bg-[#0f1230] border border-[var(--border)] text-sm"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            const val = e.currentTarget.value.trim();
+                                            if (val && !availableTags.includes(val)) {
+                                                updateAvailableTags([...availableTags, val]);
+                                                e.currentTarget.value = '';
+                                            }
+                                        }
+                                    }}
+                                />
+                                <button 
+                                    onClick={() => {
+                                        const input = document.getElementById('new-tag-input') as HTMLInputElement;
+                                        const val = input.value.trim();
+                                        if (val && !availableTags.includes(val)) {
+                                            updateAvailableTags([...availableTags, val]);
+                                            input.value = '';
+                                        }
+                                    }}
+                                    className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-bold"
+                                >
+                                    加入
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+             </motion.div>
         )}
       </AnimatePresence>
       {/* Header */}
@@ -689,9 +752,12 @@ export default function DreamJournal() {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-[#eaeaff] mb-2">標籤</h3>
+                <h3 className="text-sm font-semibold text-[#eaeaff] mb-2 flex justify-between items-center">
+                    標籤
+                    <button onClick={() => setShowTagManager(true)} className="text-xs text-[var(--accent)] hover:text-white transition-colors">管理</button>
+                </h3>
                 <div className="flex flex-wrap gap-2 mb-3">
-                    {defaultTags.map(tag => (
+                    {availableTags.map(tag => (
                         <Chip 
                             key={tag} 
                             label={tag} 
@@ -704,7 +770,7 @@ export default function DreamJournal() {
                             }}
                         />
                     ))}
-                    {Array.from(selectedTags).filter(t => !defaultTags.includes(t)).map(tag => (
+                    {Array.from(selectedTags).filter(t => !availableTags.includes(t)).map(tag => (
                          <Chip 
                             key={tag} 
                             label={tag} 
@@ -716,6 +782,13 @@ export default function DreamJournal() {
                             }}
                         />
                     ))}
+                    
+                    <button 
+                        onClick={() => setShowTagManager(true)}
+                        className="px-3 py-2 rounded-full border border-dashed border-[var(--muted)] text-[var(--muted)] text-sm hover:bg-white/5 flex items-center justify-center"
+                    >
+                        <Plus size={14} />
+                    </button>
                 </div>
                 <div className="flex gap-2">
                     <input 
@@ -940,7 +1013,7 @@ export default function DreamJournal() {
                         }
                         return (
                             <div className="p-6 rounded-2xl bg-[#0f1230] border border-dashed border-white/10 text-center">
-                                <p className="text-slate-500 text-sm">本週尚未生成 AI 週報</p>
+                                <p className="text-slate-500 text-sm">本週洞察醞釀中...</p>
                             </div>
                         );
                     })()}
@@ -1045,9 +1118,9 @@ export default function DreamJournal() {
                                             
                                             <Link 
                                                 href={`/analysis/${dream.id}`}
-                                                className="flex items-center justify-center gap-2 w-full py-2.5 mt-2 rounded-lg bg-[#1e1b4b] hover:bg-[#2e1065] text-indigo-200 text-xs font-bold border border-indigo-500/20 transition-all group-hover/card:border-indigo-500/50 group-hover/card:shadow-lg group-hover/card:shadow-indigo-500/10"
+                                                className="flex items-center justify-center gap-2 w-full py-3.5 mt-3 rounded-xl bg-[#1e1b4b] hover:bg-[#2e1065] text-indigo-200 text-sm font-bold border border-indigo-500/20 transition-all group-hover/card:border-indigo-500/50 group-hover/card:shadow-lg group-hover/card:shadow-indigo-500/10 active:scale-[0.98] shadow-md"
                                             >
-                                                <Sparkles size={12} /> 查看完整報告
+                                                <Sparkles size={14} /> 查看完整報告
                                             </Link>
                                         </div>
                                     );
@@ -1065,21 +1138,10 @@ export default function DreamJournal() {
                         </div>
                     ))}
                     {dreams.filter(d => d.date === selectedDateStr).length === 0 && (
-                        <div className="text-center py-10 text-[var(--muted)]">此日無紀錄</div>
+                        <div className="text-center py-10 text-[var(--muted)]">尚無夢境隨筆</div>
                     )}
                  </div>
              )}
-
-             {/* Export/Import */}
-             <div className="mt-6 flex gap-2 border-t border-[var(--border)] pt-4">
-                 <button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border)] text-sm hover:bg-white/5">
-                     <Download size={14} /> 匯出備份
-                 </button>
-                 <button onClick={() => importRef.current?.click()} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border)] text-sm hover:bg-white/5">
-                     <Upload size={14} /> 匯入備份
-                 </button>
-                 <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
-             </div>
           </motion.section>
         )}
       </AnimatePresence>

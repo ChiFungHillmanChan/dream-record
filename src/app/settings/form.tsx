@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useActionState, useEffect } from 'react';
+import { useState, useActionState, useEffect, useRef } from 'react';
 import { updateSettings, deleteAccount, logout, setupSuperAdmin } from '../actions/auth';
+import { getDreams, saveDream } from '../actions';
 import { createCheckoutSession, createCustomerPortalSession } from '../actions/stripe';
 import { motion } from 'framer-motion';
-import { User, Mail, Lock, Save, Trash2, LogOut, Settings as SettingsIcon, ArrowLeft, Crown, Shield, Calendar, CreditCard, ExternalLink } from 'lucide-react';
+import { User, Mail, Lock, Save, Trash2, LogOut, Settings as SettingsIcon, ArrowLeft, Crown, Shield, Calendar, CreditCard, ExternalLink, Download, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { PLANS, PLAN_FEATURES, PLAN_PRICING, ROLES } from '@/lib/constants';
@@ -44,6 +45,62 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   
   const searchParams = useSearchParams();
+  const importRef = useRef<HTMLInputElement>(null);
+  
+  const handleExport = async () => {
+      try {
+          const dreams = await getDreams();
+          const data = {
+              version: 1,
+              exportedAt: new Date().toISOString(),
+              entries: dreams
+          };
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'dream-journal-backup.json';
+          a.click();
+          URL.revokeObjectURL(url);
+      } catch (error) {
+          console.error(error);
+          alert('匯出失敗');
+      }
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+          try {
+              const data = JSON.parse(reader.result as string);
+              if (!Array.isArray(data.entries)) throw new Error('格式錯誤');
+              
+              if (!confirm('匯入將合併資料，是否繼續？')) return;
+
+              // Import simply by saving each entry
+              for (const entry of data.entries) {
+                  let tags = [];
+                  try { tags = typeof entry.tags === 'string' ? JSON.parse(entry.tags) : entry.tags; } catch {}
+                  
+                  await saveDream({
+                      id: entry.id,
+                      content: entry.content,
+                      type: entry.type,
+                      date: entry.date,
+                      tags: tags
+                  });
+              }
+              alert('記憶匯入完成');
+              window.location.reload();
+          } catch (err) {
+              alert('記憶匯入失敗');
+              console.error(err);
+          }
+      };
+      reader.readAsText(file);
+  };
   
   // Handle URL params for success/canceled
   useEffect(() => {
@@ -434,6 +491,20 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
             </button>
           </div>
         </form>
+
+        {/* Data Management */}
+        <div className="mt-8 pt-8 border-t border-white/10">
+            <h3 className="text-lg font-semibold text-white mb-4">資料備份</h3>
+            <div className="flex gap-3">
+                <button onClick={handleExport} className="flex-1 py-3 px-4 rounded-xl border border-white/10 hover:bg-white/5 transition-colors flex items-center justify-center gap-2 text-white">
+                    <Download size={18} /> 匯出所有紀錄
+                </button>
+                <button onClick={() => importRef.current?.click()} className="flex-1 py-3 px-4 rounded-xl border border-white/10 hover:bg-white/5 transition-colors flex items-center justify-center gap-2 text-white">
+                    <Upload size={18} /> 匯入備份
+                </button>
+                <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
+            </div>
+        </div>
 
         <div className="mt-12 pt-8 border-t border-white/10">
           <h3 className="text-lg font-semibold text-red-400 mb-4">危險區域</h3>
