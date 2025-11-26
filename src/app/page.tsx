@@ -136,6 +136,7 @@ export default function DreamJournal() {
   const [isListening, setIsListening] = useState(false);
   const isListeningRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // History/Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -168,42 +169,47 @@ export default function DreamJournal() {
   // Speech Recognition Setup
   useEffect(() => {
     if (typeof window !== 'undefined') {
-        const win = window as unknown as WindowWithSpeech;
+        const win = window as WindowWithSpeech;
         const SR = win.SpeechRecognition || win.webkitSpeechRecognition;
         if (SR) {
             const recognition = new SR();
-            recognition.lang = 'yue-Hant-HK'; // Optimised for Cantonese
+            // Use zh-HK (Traditional Chinese HK) for better browser support
+            // Note: yue-Hant-HK is Cantonese but has limited support
+            recognition.lang = 'zh-HK';
             recognition.continuous = true;
             recognition.interimResults = true;
             
             recognition.onresult = (event: SpeechRecognitionEvent) => {
-                let interimTranscript = '';
                 let finalTranscript = '';
 
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
                         finalTranscript += transcript;
-                    } else {
-                        interimTranscript += transcript;
                     }
                 }
 
                 if (finalTranscript) {
-                    setDreamText(prev => prev + (prev ? ' ' : '') + finalTranscript);
+                    setDreamText(prev => prev + (prev ? '' : '') + finalTranscript);
                 }
-                // Note: Interim results are tricky to append directly to state without duplicating
-                // For now, we rely on final results for the main text, but we could add a UI indicator for interim.
             };
 
             recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-                console.error('Speech recognition error', event.error);
+                console.error('Speech recognition error:', event.error);
                 if (event.error === 'not-allowed') {
-                    alert('請允許麥克風權限以使用語音輸入');
+                    alert('請允許麥克風權限以使用語音輸入 🎤');
+                    isListeningRef.current = false;
+                    setIsListening(false);
+                } else if (event.error === 'network') {
+                    alert('網絡連接出現問題，請檢查網絡設定 🌐');
+                    isListeningRef.current = false;
+                    setIsListening(false);
+                } else if (event.error === 'audio-capture') {
+                    alert('搵唔到麥克風，請確認麥克風已連接 🎙️');
                     isListeningRef.current = false;
                     setIsListening(false);
                 }
-                // Ignore 'no-speech' errors which happen often and trigger auto-restart via onend
+                // Ignore 'no-speech' and 'aborted' errors - these happen often
             };
 
             recognition.onend = () => {
@@ -228,17 +234,28 @@ export default function DreamJournal() {
 
   const toggleListening = () => {
       if (!recognitionRef.current) {
-          alert('此瀏覽器不支援語音輸入');
+          alert('呢個瀏覽器唔支援語音輸入 😢\n建議用 Chrome 或者 Edge 瀏覽器');
           return;
       }
       if (isListening) {
           isListeningRef.current = false;
-          recognitionRef.current.stop();
+          try {
+              recognitionRef.current.stop();
+          } catch {
+              // Ignore errors when stopping
+          }
           setIsListening(false);
       } else {
           isListeningRef.current = true;
-          recognitionRef.current.start();
-          setIsListening(true);
+          try {
+              recognitionRef.current.start();
+              setIsListening(true);
+          } catch (err) {
+              console.error('Failed to start speech recognition:', err);
+              isListeningRef.current = false;
+              setIsListening(false);
+              alert('語音輸入啟動失敗，請確認麥克風權限已開啟 🎤');
+          }
       }
   };
 
@@ -479,6 +496,58 @@ export default function DreamJournal() {
       <AnimatePresence>
         {isAnalyzing && <DreamLoading />}
       </AnimatePresence>
+      
+      {/* Clear Confirmation Dialog */}
+      <AnimatePresence>
+        {showClearConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowClearConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-gradient-to-br from-[#1a1d3d] to-[#0f1230] border border-[var(--border)] rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center">
+                  <span className="text-3xl">🗑️</span>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">等等，諗清楚先！</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  你確定要清空依家寫低嘅野？<br />
+                  清空咗就冇得返轉頭㗎喇 🥺
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowClearConfirm(false)}
+                  className="flex-1 py-3 px-4 rounded-xl border border-[var(--border)] text-slate-300 font-medium hover:bg-white/5 transition-colors"
+                >
+                  唔好住 😅
+                </button>
+                <button
+                  onClick={() => {
+                    setDreamText('');
+                    setAnalysisResult(null);
+                    setShowClearConfirm(false);
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold hover:opacity-90 transition-opacity"
+                >
+                  清空佢 💨
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Header */}
       <header className="flex items-center justify-between p-3 border border-[var(--border)] rounded-2xl bg-[var(--surface)] mb-3 relative z-10">
         <div className="flex items-center gap-3">
@@ -580,7 +649,11 @@ export default function DreamJournal() {
                         <Mic size={14} /> {isListening ? '停止收聽' : '語音輸入'}
                     </button>
                     <button 
-                        onClick={() => { setDreamText(''); setAnalysisResult(null); }}
+                        onClick={() => {
+                          if (dreamText.trim() || analysisResult) {
+                            setShowClearConfirm(true);
+                          }
+                        }}
                         className="px-3 py-2 rounded-xl border border-[var(--border)] text-[var(--muted)] text-sm hover:bg-white/5"
                     >
                         清空
