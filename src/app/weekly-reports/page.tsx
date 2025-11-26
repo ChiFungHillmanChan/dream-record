@@ -1,4 +1,4 @@
-import { getWeeklyReports, getCurrentUser } from '@/app/actions';
+import { getWeeklyReports, getCurrentUser, getWeeklyReportStatus } from '@/app/actions';
 import WeeklyReportsClient from './WeeklyReportsClient';
 import { redirect } from 'next/navigation';
 
@@ -8,11 +8,18 @@ export default async function WeeklyReportsPage() {
     redirect('/login');
   }
 
-  const reports = await getWeeklyReports();
+  const [reports, status] = await Promise.all([
+    getWeeklyReports(),
+    getWeeklyReportStatus()
+  ]);
 
   return (
     <main className="min-h-screen bg-black text-white">
-       <WeeklyReportsClient initialReports={reports} userPlan={user.plan} />
+       <WeeklyReportsClient 
+         initialReports={reports} 
+         userPlan={user.plan} 
+         reportStatus={status}
+       />
     </main>
   );
 }

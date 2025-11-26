@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { generateWeeklyReport, WeeklyReportData } from '@/app/actions';
+import { generateWeeklyReport, WeeklyReportData, WeeklyReportStatus } from '@/app/actions';
 import { PLANS } from '@/lib/constants';
-import { Loader2, Lock, Sparkles, ArrowLeft, Calendar, Brain, Heart, Zap } from 'lucide-react';
+import { Loader2, Lock, Sparkles, ArrowLeft, Calendar, Brain, Heart, Zap, Crown, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 // Temporary type until Prisma client is fully updated and types are shared
@@ -17,7 +17,13 @@ type WeeklyReport = {
   createdAt: Date;
 };
 
-export default function WeeklyReportsClient({ initialReports, userPlan }: { initialReports: WeeklyReport[], userPlan: string }) {
+interface WeeklyReportsClientProps {
+  initialReports: WeeklyReport[];
+  userPlan: string;
+  reportStatus: WeeklyReportStatus | null;
+}
+
+export default function WeeklyReportsClient({ initialReports, userPlan, reportStatus }: WeeklyReportsClientProps) {
   const [reports] = useState<WeeklyReport[]>(initialReports);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedReport, setSelectedReport] = useState<WeeklyReport | null>(null);
@@ -82,10 +88,54 @@ export default function WeeklyReportsClient({ initialReports, userPlan }: { init
                 <p className="text-neutral-400 max-w-xl mb-8 leading-relaxed">
                   每週日，我們將你過去七天的夢境編織成一個故事，揭示隱藏的情緒軌跡與心理原型。
                 </p>
+
+                {/* Weekly Report Status */}
+                {reportStatus && (
+                  <div className="mb-8 p-4 bg-white/5 border border-white/10 rounded-2xl max-w-md w-full">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm text-neutral-400">本週週報</span>
+                      <span className="text-xs font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded-full">
+                        {new Date(reportStatus.weekStartDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })} - {new Date(reportStatus.weekEndDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="text-left">
+                        <div className="text-xs text-neutral-500 mb-1">已生成 / 上限</div>
+                        <div className="text-lg font-bold text-white">
+                          {reportStatus.reportsUsed} / {reportStatus.reportsLimit}
+                          {reportStatus.isPremium && <Crown className="inline w-4 h-4 ml-1 text-amber-400" />}
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <div className="text-xs text-neutral-500 mb-1">記錄天數 / 需求</div>
+                        <div className={`text-lg font-bold ${reportStatus.daysRecorded >= reportStatus.daysRequired ? 'text-green-400' : 'text-amber-400'}`}>
+                          {reportStatus.daysRecorded} / {reportStatus.daysRequired} 天
+                        </div>
+                      </div>
+                    </div>
+
+                    {!reportStatus.canGenerate && (
+                      <div className="flex items-start gap-2 text-sm text-amber-400 bg-amber-500/10 p-3 rounded-xl">
+                        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <span>
+                          {reportStatus.reportsUsed >= reportStatus.reportsLimit 
+                            ? '本週週報配額已用完' 
+                            : `還需要 ${reportStatus.daysRequired - reportStatus.daysRecorded} 天的夢境記錄`}
+                          {!reportStatus.isPremium && reportStatus.daysRecorded < reportStatus.daysRequired && (
+                            <Link href="/settings" className="ml-1 text-purple-400 hover:underline">
+                              升級深度版只需 3 天
+                            </Link>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 <button
                   onClick={handleGenerate}
-                  disabled={isGenerating}
+                  disabled={isGenerating || (reportStatus && !reportStatus.canGenerate)}
                   className="relative group px-8 py-4 bg-white text-black rounded-full font-medium text-lg hover:bg-neutral-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
                 >
                   <span className="relative z-10 flex items-center">
@@ -98,6 +148,11 @@ export default function WeeklyReportsClient({ initialReports, userPlan }: { init
                       <>
                         <Sparkles className="w-5 h-5 mr-2" />
                         生成本週報告
+                        {reportStatus && (
+                          <span className="ml-2 text-sm opacity-60">
+                            ({reportStatus.reportsLimit - reportStatus.reportsUsed} 次剩餘)
+                          </span>
+                        )}
                       </>
                     )}
                   </span>

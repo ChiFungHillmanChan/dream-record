@@ -318,36 +318,101 @@ export type WeeklyReportData = {
   image_prompt: string;
 };
 
+// Helper function to get current week boundaries (Sunday to Saturday)
+function getCurrentWeekBoundaries(): { weekStart: Date; weekEnd: Date } {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
+  
+  // Get Sunday of current week (start)
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - dayOfWeek);
+  weekStart.setHours(0, 0, 0, 0);
+  
+  // Get Saturday of current week (end)
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
+  
+  return { weekStart, weekEnd };
+}
+
+// Weekly report limits configuration
+const WEEKLY_REPORT_LIMITS = {
+  FREE: {
+    maxReportsPerWeek: 1,
+    minDaysRequired: 5,
+  },
+  DEEP: {
+    maxReportsPerWeek: 2,
+    minDaysRequired: 3,
+  },
+} as const;
+
 export async function generateWeeklyReport(): Promise<{ success: boolean; error?: string }> {
   const session = await getSession();
   if (!session?.userId) return { success: false, error: '請先登入' };
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId as string },
-    select: { id: true, plan: true }
+    select: { id: true, plan: true, role: true }
   });
 
   if (!user) return { success: false, error: '找不到用戶' };
 
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - 7);
+  // Determine if user has premium access (DEEP plan or SUPERADMIN)
+  const isPremium = user.plan === PLANS.DEEP || user.role === ROLES.SUPERADMIN;
+  const limits = isPremium ? WEEKLY_REPORT_LIMITS.DEEP : WEEKLY_REPORT_LIMITS.FREE;
 
-  // Get dreams
+  // Get current week boundaries (Sunday to Saturday)
+  const { weekStart, weekEnd } = getCurrentWeekBoundaries();
+
+  // Check how many reports were already generated this week
+  const reportsThisWeek = await prisma.weeklyReport.count({
+    where: {
+      userId: user.id,
+      createdAt: {
+        gte: weekStart,
+        lte: weekEnd
+      }
+    }
+  });
+
+  if (reportsThisWeek >= limits.maxReportsPerWeek) {
+    return { 
+      success: false, 
+      error: isPremium 
+        ? `本週已生成 ${limits.maxReportsPerWeek} 份週報，下週日可再生成` 
+        : `免費版每週只能生成 ${limits.maxReportsPerWeek} 份週報。升級深度版可生成更多！`
+    };
+  }
+
+  // Get dreams for the current week
   const dreams = await prisma.dream.findMany({
     where: {
       userId: user.id,
       createdAt: {
-        gte: startDate,
-        lte: endDate
+        gte: weekStart,
+        lte: weekEnd
       }
     },
     orderBy: { createdAt: 'asc' }
   });
 
-  if (dreams.length < 3) {
-     return { success: false, error: '過去 7 天的夢境記錄太少，無法生成週報 (至少需要 3 個夢)' };
+  // Count unique days with dream records
+  const uniqueDays = new Set(dreams.map(d => d.date)).size;
+
+  if (uniqueDays < limits.minDaysRequired) {
+    return { 
+      success: false, 
+      error: isPremium
+        ? `本週需要至少 ${limits.minDaysRequired} 天的夢境記錄才能生成週報 (目前 ${uniqueDays} 天)`
+        : `免費版需要至少 ${limits.minDaysRequired} 天的夢境記錄才能生成週報 (目前 ${uniqueDays} 天)。升級深度版只需 ${WEEKLY_REPORT_LIMITS.DEEP.minDaysRequired} 天！`
+    };
   }
+
+  // Use week boundaries for the report
+  const startDate = weekStart;
+  const endDate = weekEnd;
 
   const dreamsText = dreams.map(d => `[${d.date}]: ${d.content} (Tags: ${d.tags})`).join('\n');
 
@@ -502,6 +567,72 @@ export async function getWeeklyReports(): Promise<WeeklyReport[]> {
     where: { userId: session.userId as string },
     orderBy: { createdAt: 'desc' }
   });
+}
+
+// Weekly report status for UI
+export type WeeklyReportStatus = {
+  reportsUsed: number;
+  reportsLimit: number;
+  daysRecorded: number;
+  daysRequired: number;
+  canGenerate: boolean;
+  isPremium: boolean;
+  weekStartDate: string;
+  weekEndDate: string;
+};
+
+export async function getWeeklyReportStatus(): Promise<WeeklyReportStatus | null> {
+  const session = await getSession();
+  if (!session?.userId) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId as string },
+    select: { id: true, plan: true, role: true }
+  });
+
+  if (!user) return null;
+
+  const isPremium = user.plan === PLANS.DEEP || user.role === ROLES.SUPERADMIN;
+  const limits = isPremium ? WEEKLY_REPORT_LIMITS.DEEP : WEEKLY_REPORT_LIMITS.FREE;
+  
+  const { weekStart, weekEnd } = getCurrentWeekBoundaries();
+
+  // Count reports generated this week
+  const reportsUsed = await prisma.weeklyReport.count({
+    where: {
+      userId: user.id,
+      createdAt: {
+        gte: weekStart,
+        lte: weekEnd
+      }
+    }
+  });
+
+  // Get dreams for the current week
+  const dreams = await prisma.dream.findMany({
+    where: {
+      userId: user.id,
+      createdAt: {
+        gte: weekStart,
+        lte: weekEnd
+      }
+    },
+    select: { date: true }
+  });
+
+  const daysRecorded = new Set(dreams.map(d => d.date)).size;
+  const canGenerate = reportsUsed < limits.maxReportsPerWeek && daysRecorded >= limits.minDaysRequired;
+
+  return {
+    reportsUsed,
+    reportsLimit: limits.maxReportsPerWeek,
+    daysRecorded,
+    daysRequired: limits.minDaysRequired,
+    canGenerate,
+    isPremium,
+    weekStartDate: weekStart.toISOString().split('T')[0],
+    weekEndDate: weekEnd.toISOString().split('T')[0],
+  };
 }
 
 // Type for dream with analysis
