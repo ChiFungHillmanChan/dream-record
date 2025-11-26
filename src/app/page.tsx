@@ -6,13 +6,14 @@ import {
   ChevronLeft, ChevronRight,
   Download, Upload, Settings, Shield, Crown, Lock, Sparkles
 } from 'lucide-react';
-import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo } from '@/app/actions';
+import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo, getRemainingFreeAnalyses } from '@/app/actions';
 import { ROLES, PLANS } from '@/lib/constants';
 import type { Dream } from '@prisma/client';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 // --- Types & Constants ---
 type CalendarMode = 'month' | 'week' | 'day';
@@ -90,9 +91,12 @@ const Chip = ({ label, active, onClick, onRemove }: { label: string, active?: bo
 // --- Main Component ---
 
 export default function DreamJournal() {
+  const router = useRouter();
+  
   // Data State
   const [dreams, setDreams] = useState<Dream[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUserInfo>(null);
+  const [remainingAnalyses, setRemainingAnalyses] = useState<number>(0);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'record' | 'history'>('record');
@@ -127,8 +131,12 @@ export default function DreamJournal() {
   }, []);
 
   const loadCurrentUser = async () => {
-    const user = await getCurrentUser();
+    const [user, remaining] = await Promise.all([
+      getCurrentUser(),
+      getRemainingFreeAnalyses()
+    ]);
     setCurrentUser(user);
+    setRemainingAnalyses(remaining);
   };
 
   // Speech Recognition Setup
@@ -258,8 +266,46 @@ export default function DreamJournal() {
         setIsAnalyzing(false);
         return;
     }
+    
+    if (result) {
+      // Save the dream with analysis and redirect to analysis page
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      
+      const data: DreamData = {
+        id: editingId || undefined,
+        content: dreamText,
+        type: 'dream',
+        date: dateStr,
+        tags: Array.from(selectedTags),
+        analysis: JSON.stringify(result),
+      };
+
+      const res = await saveDream(data);
+      if (res.success) {
+        // Reload dreams to get the new dream ID
+        const updatedDreams = await getDreams();
+        // Find the newly created/updated dream
+        const newDream = updatedDreams.find(d => 
+          d.content === dreamText && d.date === dateStr
+        );
+        
+        if (newDream) {
+          // Reset form
+          setDreamText('');
+          setSelectedTags(new Set());
+          setEditingId(null);
+          setAnalysisResult(null);
+          
+          // Navigate to analysis page
+          router.push(`/analysis/${newDream.id}`);
+        }
+      }
+    }
+    
     setAnalysisResult(result);
     setIsAnalyzing(false);
+    loadCurrentUser(); // Reload to update remaining analyses count
   };
 
   const handleExport = () => {
@@ -477,10 +523,16 @@ export default function DreamJournal() {
                     </button>
                      <button 
                         onClick={handleAnalyze}
-                        disabled={isAnalyzing || !dreamText}
-                        className="px-3 py-2 rounded-xl bg-indigo-600 text-white text-sm hover:bg-indigo-500 disabled:opacity-50"
+                        disabled={isAnalyzing || !dreamText || (currentUser?.plan !== PLANS.DEEP && remainingAnalyses <= 0)}
+                        className="px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
                     >
+                        <Sparkles size={14} />
                         {isAnalyzing ? '分析中...' : 'AI 解析'}
+                        {currentUser?.plan !== PLANS.DEEP && remainingAnalyses >= 0 && (
+                          <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
+                            {remainingAnalyses}
+                          </span>
+                        )}
                     </button>
                  </div>
                  
@@ -659,8 +711,8 @@ export default function DreamJournal() {
 
              {/* Views */}
              {calendarMode === 'month' && (
-                 <div className="grid grid-cols-7 gap-1.5 text-center">
-                     {['日','一','二','三','四','五','六'].map(d => <div key={d} className="text-xs text-[var(--muted)] py-2">{d}</div>)}
+                 <div className="grid grid-cols-7 gap-1 md:gap-1.5 text-center">
+                     {['日','一','二','三','四','五','六'].map(d => <div key={d} className="text-xs text-[var(--muted)] py-1 md:py-2">{d}</div>)}
                      {getDaysInMonth(currentDate).map((d, i) => {
                         if (!d) return <div key={`empty-${i}`} />;
                         const dateStr = d.toISOString().split('T')[0];
@@ -673,20 +725,20 @@ export default function DreamJournal() {
                                 key={dateStr}
                                 onClick={() => { setSelectedDateStr(dateStr); setCalendarMode('day'); }}
                                 className={cn(
-                                    "relative h-16 rounded-xl border border-[var(--border)] bg-[#0f1230] p-1 flex flex-col items-start justify-between transition-all",
+                                    "relative h-12 md:h-16 rounded-lg md:rounded-xl border border-[var(--border)] bg-[#0f1230] p-0.5 md:p-1 flex flex-col items-start justify-between transition-all active:scale-95",
                                     isToday && "ring-2 ring-[var(--accent2)]",
                                     isSelected && "shadow-[inset_0_0_0_2px_var(--accent)]"
                                 )}
                             >
-                                <span className="text-xs opacity-70 ml-1">{d.getDate()}</span>
-                                <div className="flex flex-wrap gap-0.5 px-1 w-full">
+                                <span className="text-[10px] md:text-xs opacity-70 ml-0.5 md:ml-1">{d.getDate()}</span>
+                                <div className="flex flex-wrap gap-0.5 px-0.5 md:px-1 w-full">
                                     {dayDreams.flatMap(dd => {
                                         try { return JSON.parse(dd.tags).slice(0, 3); } catch { return []; }
                                     }).map((tag: string, idx: number) => (
-                                        <span key={idx} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getTagColor(tag) }} />
+                                        <span key={idx} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full" style={{ backgroundColor: getTagColor(tag) }} />
                                     ))}
                                     {dayDreams.some(dd => dd.type === 'no_dream') && !dayDreams.some(dd => dd.type === 'dream') && (
-                                        <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                        <span className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-white/30" />
                                     )}
                                 </div>
                             </button>
@@ -709,34 +761,43 @@ export default function DreamJournal() {
                                 <div className="text-xs text-[var(--muted)] flex items-center gap-2">
                                     {dream.type === 'dream' ? '✨ 夢境' : '😴 無夢'} · {new Date(dream.createdAt).toLocaleTimeString()}
                                 </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleEdit(dream)} className="p-1 hover:text-[var(--accent)]"><Edit2 size={14}/></button>
-                                    <button onClick={() => handleDelete(dream.id)} className="p-1 hover:text-[var(--danger)]"><Trash2 size={14}/></button>
+                                {/* Actions - always visible on mobile */}
+                                <div className="flex gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                    {dream.analysis && (
+                                        <Link href={`/analysis/${dream.id}`} className="p-1.5 hover:text-[var(--accent2)] text-[var(--muted)]" title="查看完整解析">
+                                            <Sparkles size={14}/>
+                                        </Link>
+                                    )}
+                                    <button onClick={() => handleEdit(dream)} className="p-1.5 hover:text-[var(--accent)] text-[var(--muted)]"><Edit2 size={14}/></button>
+                                    <button onClick={() => handleDelete(dream.id)} className="p-1.5 hover:text-[var(--danger)] text-[var(--muted)]"><Trash2 size={14}/></button>
                                 </div>
                             </div>
-                            <div className="whitespace-pre-wrap mb-3">{dream.content}</div>
+                            <div className="whitespace-pre-wrap mb-3 text-sm md:text-base">{dream.content}</div>
                             {dream.analysis && (() => {
                                 try {
                                     const analysis = JSON.parse(dream.analysis);
                                     return (
-                                        <div className="mb-3 p-3 bg-[var(--surface)] rounded-lg text-xs border border-white/5 space-y-1">
-                                            <div className="text-[var(--accent2)] font-bold mb-1">AI 分析報告</div>
-                                            <p><span className="opacity-70">摘要：</span>{analysis.summary}</p>
+                                        <Link href={`/analysis/${dream.id}`} className="block mb-3 p-3 bg-[var(--surface)] rounded-lg text-xs border border-white/5 space-y-1 hover:border-[var(--accent)]/30 transition-colors">
+                                            <div className="text-[var(--accent2)] font-bold mb-1 flex items-center gap-2">
+                                                <Sparkles size={12} />
+                                                AI 分析報告
+                                                <span className="ml-auto text-[10px] text-[var(--muted)]">點擊查看完整 →</span>
+                                            </div>
+                                            <p className="line-clamp-2"><span className="opacity-70">摘要：</span>{analysis.summary}</p>
                                             <p><span className="opacity-70">氛圍：</span>{analysis.vibe}</p>
                                             
                                             {analysis.analysis ? (
                                                 <div className="pt-2 mt-2 border-t border-white/5">
-                                                    <p className="mb-1"><span className="opacity-70">深度解析：</span>{analysis.analysis}</p>
-                                                    <p><span className="opacity-70">建議：</span>{analysis.reflection}</p>
+                                                    <p className="line-clamp-2"><span className="opacity-70">深度解析：</span>{analysis.analysis}</p>
                                                 </div>
                                             ) : (
-                                                <Link href="/settings" className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5 text-[var(--muted)] hover:text-white transition-colors group">
+                                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5 text-[var(--muted)]">
                                                     <Lock size={12} />
                                                     <span>解鎖深度解析</span>
-                                                    <span className="text-[10px] bg-[var(--accent)] text-white px-1.5 py-0.5 rounded ml-auto opacity-0 group-hover:opacity-100 transition-opacity">Upgrade</span>
-                                                </Link>
+                                                    <span className="text-[10px] bg-[var(--accent)] text-white px-1.5 py-0.5 rounded ml-auto">Upgrade</span>
+                                                </div>
                                             )}
-                                        </div>
+                                        </Link>
                                     );
                                 } catch { return null; }
                             })()}

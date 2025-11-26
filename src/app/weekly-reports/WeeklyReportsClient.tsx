@@ -51,12 +51,12 @@ export default function WeeklyReportsClient({ initialReports, userPlan }: { init
       </div>
 
       <div className="relative z-10 max-w-4xl mx-auto px-4 py-8">
-        <header className="flex items-center justify-between mb-12">
+        <header className="flex items-center justify-between mb-8 md:mb-12">
           <Link href="/" className="flex items-center text-neutral-400 hover:text-white transition-colors group">
-            <ArrowLeft className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" />
-            Back to Journal
+            <ArrowLeft className="w-5 h-5 mr-1 md:mr-2 group-hover:-translate-x-1 transition-transform" />
+            <span className="hidden md:inline">返回日記</span>
           </Link>
-          <h1 className="text-xl font-light tracking-widest uppercase text-purple-400/80">Weekly Insights</h1>
+          <h1 className="text-lg md:text-xl font-light tracking-widest uppercase text-purple-400/80">夢境週報</h1>
         </header>
 
         <AnimatePresence mode="wait">

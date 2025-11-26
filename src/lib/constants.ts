@@ -6,6 +6,9 @@ export const PLANS = {
 
 export type PlanType = typeof PLANS[keyof typeof PLANS];
 
+// Free user analysis limit (lifetime)
+export const FREE_ANALYSIS_LIMIT = 20;
+
 // User Roles
 export const ROLES = {
   USER: 'USER',

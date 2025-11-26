@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { getOpenAI } from '@/app/services/openai';
 import { loadPromptFile } from '@/app/services/load-prompts';
 import { getSession } from '@/lib/auth';
-import { PLANS } from '@/lib/constants';
+import { PLANS, FREE_ANALYSIS_LIMIT } from '@/lib/constants';
 
 // User info type for header display
 export type CurrentUserInfo = {
@@ -15,12 +15,48 @@ export type CurrentUserInfo = {
   email: string;
   role: string;
   plan: string;
+  planExpiresAt: Date | null;
+  lifetimeAnalysisCount: number;
 } | null;
+
+/**
+ * Check and update user plan based on expiration date
+ * Returns the effective plan (may differ from stored if expired)
+ */
+async function checkAndUpdatePlanExpiration(userId: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { plan: true, planExpiresAt: true }
+  });
+
+  if (!user) return PLANS.FREE;
+
+  // If user has DEEP plan and planExpiresAt has passed, revert to FREE
+  if (user.plan === PLANS.DEEP && user.planExpiresAt) {
+    const now = new Date();
+    if (user.planExpiresAt < now) {
+      // Plan has expired - revert to FREE
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          plan: PLANS.FREE,
+          planExpiresAt: null
+        }
+      });
+      return PLANS.FREE;
+    }
+  }
+
+  return user.plan;
+}
 
 // Get current user info for header display
 export async function getCurrentUser(): Promise<CurrentUserInfo> {
   const session = await getSession();
   if (!session?.userId) return null;
+
+  // First check and update plan expiration
+  await checkAndUpdatePlanExpiration(session.userId as string);
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId as string },
@@ -30,6 +66,8 @@ export async function getCurrentUser(): Promise<CurrentUserInfo> {
       email: true,
       role: true,
       plan: true,
+      planExpiresAt: true,
+      lifetimeAnalysisCount: true,
     },
   });
 
@@ -160,46 +198,28 @@ export async function analyzeDream(content: string): Promise<{ result: DreamAnal
   const session = await getSession();
   if (!session?.userId) return { result: null, error: '請先登入' };
 
+  // Check and update plan expiration first
+  const effectivePlan = await checkAndUpdatePlanExpiration(session.userId as string);
+
   const user = await prisma.user.findUnique({
       where: { id: session.userId as string },
       select: { 
         plan: true,
-        dailyAnalysisCount: true,
-        lastAnalysisDate: true,
+        lifetimeAnalysisCount: true,
         id: true
       }
   });
 
   if (!user) return { result: null, error: '找不到用戶' };
 
-  // Check Daily Limits
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const lastDate = new Date(user.lastAnalysisDate);
-  lastDate.setHours(0, 0, 0, 0);
+  // Use effective plan (in case it was just updated due to expiration)
+  const currentPlan = effectivePlan;
 
-  let currentCount = user.dailyAnalysisCount;
-
-  // Reset count if it's a new day
-  if (lastDate < today) {
-    currentCount = 0;
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { 
-        dailyAnalysisCount: 0,
-        lastAnalysisDate: new Date()
-      }
-    });
-  }
-
-  // Limit Check
-  const limit = user.plan === PLANS.DEEP ? 10 : 1;
-  if (currentCount >= limit) {
+  // Lifetime limit check for FREE users
+  if (currentPlan === PLANS.FREE && user.lifetimeAnalysisCount >= FREE_ANALYSIS_LIMIT) {
     return { 
       result: null, 
-      error: user.plan === PLANS.DEEP 
-        ? '您今天的生成次數已達上限（10次）。' 
-        : '免費版每天只能生成一次。升級解鎖更多次數！' 
+      error: `免費版的 ${FREE_ANALYSIS_LIMIT} 次 AI 解析已用完。升級深度版享無限解析！` 
     };
   }
 
@@ -253,16 +273,18 @@ export async function analyzeDream(content: string): Promise<{ result: DreamAnal
         if (textContent) {
             const result = JSON.parse(textContent);
             
-            // Increment count
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { 
-                dailyAnalysisCount: { increment: 1 },
-                lastAnalysisDate: new Date()
-              }
-            });
+            // Increment lifetime count for FREE users
+            if (currentPlan === PLANS.FREE) {
+              await prisma.user.update({
+                where: { id: user.id },
+                data: { 
+                  lifetimeAnalysisCount: { increment: 1 }
+                }
+              });
+            }
 
-            if (user.plan === PLANS.FREE) {
+            // For FREE users, redact deep analysis
+            if (currentPlan === PLANS.FREE) {
                 return {
                     result: {
                       ...result,
@@ -480,4 +502,41 @@ export async function getWeeklyReports(): Promise<WeeklyReport[]> {
     where: { userId: session.userId as string },
     orderBy: { createdAt: 'desc' }
   });
+}
+
+// Type for dream with analysis
+export type DreamWithAnalysis = Dream & {
+  analysis: string | null;
+};
+
+// Get a single dream by ID
+export async function getDreamById(id: string): Promise<DreamWithAnalysis | null> {
+  const session = await getSession();
+  if (!session?.userId) return null;
+
+  const dream = await prisma.dream.findUnique({
+    where: { id }
+  });
+
+  if (!dream || dream.userId !== session.userId) {
+    return null;
+  }
+
+  return dream;
+}
+
+// Get remaining free analyses count
+export async function getRemainingFreeAnalyses(): Promise<number> {
+  const session = await getSession();
+  if (!session?.userId) return 0;
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId as string },
+    select: { lifetimeAnalysisCount: true, plan: true }
+  });
+
+  if (!user) return 0;
+  if (user.plan === PLANS.DEEP) return -1; // -1 means unlimited
+
+  return Math.max(0, FREE_ANALYSIS_LIMIT - user.lifetimeAnalysisCount);
 }

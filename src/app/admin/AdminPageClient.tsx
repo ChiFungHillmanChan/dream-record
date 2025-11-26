@@ -78,16 +78,17 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto px-4 md:px-0">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="mb-6 md:mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-2 md:gap-4">
           <Link href="/" className="p-2 hover:bg-white/10 rounded-full transition-colors">
-            <ArrowLeft className="w-6 h-6 text-white" />
+            <ArrowLeft className="w-5 h-5 md:w-6 md:h-6 text-white" />
           </Link>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <Shield className="w-8 h-8 text-amber-400" />
-            管理員控制台
+          <h1 className="text-xl md:text-3xl font-bold text-white flex items-center gap-2 md:gap-3">
+            <Shield className="w-6 h-6 md:w-8 md:h-8 text-amber-400" />
+            <span className="hidden sm:inline">管理員控制台</span>
+            <span className="sm:hidden">管理</span>
           </h1>
         </div>
       </div>

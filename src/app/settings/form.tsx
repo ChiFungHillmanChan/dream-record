@@ -111,21 +111,21 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="max-w-2xl mx-auto px-4 md:px-0">
+      <div className="mb-6 md:mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-2 md:gap-4">
             <Link href="/" className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                <ArrowLeft className="w-6 h-6 text-white" />
+                <ArrowLeft className="w-5 h-5 md:w-6 md:h-6 text-white" />
             </Link>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <SettingsIcon className="w-8 h-8 text-accent" />
+            <h1 className="text-xl md:text-3xl font-bold text-white flex items-center gap-2 md:gap-3">
+            <SettingsIcon className="w-6 h-6 md:w-8 md:h-8 text-accent" />
             設定
             </h1>
         </div>
         <form action={logout}>
-            <button className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors px-4 py-2 rounded-lg hover:bg-red-500/10">
-                <LogOut className="w-5 h-5" />
-                登出
+            <button className="flex items-center gap-1.5 md:gap-2 text-red-400 hover:text-red-300 transition-colors px-3 py-2 md:px-4 rounded-lg hover:bg-red-500/10 text-sm md:text-base">
+                <LogOut className="w-4 h-4 md:w-5 md:h-5" />
+                <span className="hidden md:inline">登出</span>
             </button>
         </form>
       </div>
@@ -213,7 +213,7 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
           我的計劃
         </h2>
         
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           {/* Current Plan */}
           <div className={`p-4 rounded-2xl border ${
             user.plan === PLANS.DEEP 
@@ -255,11 +255,11 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
               </div>
               
               {/* Billing Period Toggle */}
-              <div className="flex gap-2 mb-3">
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
                 <button
                   type="button"
                   onClick={() => setBillingPeriod('monthly')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm transition-all ${
+                  className={`flex-1 py-3 px-3 rounded-lg text-sm transition-all ${
                     billingPeriod === 'monthly'
                       ? 'bg-purple-500/30 text-white border border-purple-500/50'
                       : 'bg-black/20 text-gray-400 border border-white/10'
@@ -270,7 +270,7 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
                 <button
                   type="button"
                   onClick={() => setBillingPeriod('yearly')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm transition-all ${
+                  className={`flex-1 py-3 px-3 rounded-lg text-sm transition-all ${
                     billingPeriod === 'yearly'
                       ? 'bg-purple-500/30 text-white border border-purple-500/50'
                       : 'bg-black/20 text-gray-400 border border-white/10'
