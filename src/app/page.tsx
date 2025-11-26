@@ -21,40 +21,6 @@ import { DreamResult } from '@/components/DreamResult';
 // --- Types & Constants ---
 type CalendarMode = 'month' | 'week' | 'day';
 
-interface SpeechRecognitionEvent {
-    resultIndex: number;
-    results: {
-        [key: number]: {
-            [key: number]: {
-                transcript: string;
-            };
-            isFinal: boolean;
-        };
-        length: number;
-    };
-}
-
-interface SpeechRecognitionErrorEvent {
-    error: string;
-    message?: string;
-}
-
-interface SpeechRecognition extends EventTarget {
-    lang: string;
-    continuous: boolean;
-    interimResults: boolean;
-    start(): void;
-    stop(): void;
-    onresult: (event: SpeechRecognitionEvent) => void;
-    onerror: (event: SpeechRecognitionErrorEvent) => void;
-    onend: () => void;
-}
-
-interface WindowWithSpeech extends Window {
-    SpeechRecognition?: { new(): SpeechRecognition };
-    webkitSpeechRecognition?: { new(): SpeechRecognition };
-}
-
 const TAG_PALETTE = [
   '#a78bfa', '#22d3ee', '#fb7185', '#34d399', '#fbbf24', 
   '#f472b6', '#60a5fa', '#f87171', '#c084fc', '#2dd4bf'
@@ -135,9 +101,13 @@ export default function DreamJournal() {
   const [analysisResult, setAnalysisResult] = useState<DreamAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const isListeningRef = useRef(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  
+  // Voice Recording with Whisper API
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   // History/Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,96 +174,97 @@ export default function DreamJournal() {
     setRemainingAnalyses(remaining);
   };
 
-  // Speech Recognition Setup
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-        const win = window as WindowWithSpeech;
-        const SR = win.SpeechRecognition || win.webkitSpeechRecognition;
-        if (SR) {
-            const recognition = new SR();
-            // Use zh-HK (Traditional Chinese HK) for better browser support
-            // Note: yue-Hant-HK is Cantonese but has limited support
-            recognition.lang = 'zh-HK';
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            
-            recognition.onresult = (event: SpeechRecognitionEvent) => {
-                let finalTranscript = '';
+  // Voice Recording Setup - Using Whisper API for all platforms
+  // This provides consistent behavior across browsers, mobile, and PWA modes
 
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscript += transcript;
-                    }
-                }
-
-                if (finalTranscript) {
-                    setDreamText(prev => prev + (prev ? '' : '') + finalTranscript);
-                }
-            };
-
-            recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-                console.error('Speech recognition error:', event.error);
-                if (event.error === 'not-allowed') {
-                    alert('請允許權限以傳送夢囈 🎤');
-                    isListeningRef.current = false;
-                    setIsListening(false);
-                } else if (event.error === 'network') {
-                    alert('靈界連結中斷，請檢查網絡 🌐');
-                    isListeningRef.current = false;
-                    setIsListening(false);
-                } else if (event.error === 'audio-capture') {
-                    alert('尋不到傳音法器（麥克風），請確認連接 🎙️');
-                    isListeningRef.current = false;
-                    setIsListening(false);
-                }
-                // Ignore 'no-speech' and 'aborted' errors - these happen often
-            };
-
-            recognition.onend = () => {
-               // Check if we should still be listening (auto-restart if stopped unexpectedly)
-               if (isListeningRef.current) {
-                   try {
-                       recognition.start();
-                   } catch {
-                       // If start fails (e.g. already started), stop properly
-                       setIsListening(false);
-                       isListeningRef.current = false;
-                   }
-               } else {
-                   setIsListening(false);
-               }
-            };
-
-            recognitionRef.current = recognition;
-        }
-    }
-  }, []);
-
-  const toggleListening = () => {
-      if (!recognitionRef.current) {
-          alert('此法器（瀏覽器）無法接收夢囈 😢\n建議更換 Chrome 或 Edge');
-          return;
+  // Transcribe audio using Whisper API (for PWA fallback)
+  const transcribeAudio = async (audioBlob: Blob) => {
+      setIsTranscribing(true);
+      try {
+          const formData = new FormData();
+          // Whisper works best with webm or mp4, but we'll send what we have
+          formData.append('audio', audioBlob, 'recording.webm');
+          
+          const response = await fetch('/api/transcribe', {
+              method: 'POST',
+              body: formData,
+          });
+          
+          const result = await response.json();
+          
+          if (result.success && result.text) {
+              setDreamText(prev => prev + (prev ? '' : '') + result.text);
+          } else if (result.error) {
+              console.error('Transcription error:', result.error);
+              alert('語音轉文字失敗，請再試一次 🎤');
+          }
+      } catch (err) {
+          console.error('Failed to transcribe audio:', err);
+          alert('語音轉文字失敗，請檢查網絡連接 🌐');
+      } finally {
+          setIsTranscribing(false);
       }
-      if (isListening) {
-          isListeningRef.current = false;
-          try {
-              recognitionRef.current.stop();
-          } catch {
-              // Ignore errors when stopping
+  };
+
+  // Start voice recording with MediaRecorder
+  const startRecording = async () => {
+      try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const mediaRecorder = new MediaRecorder(stream, {
+              mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+          });
+          
+          audioChunksRef.current = [];
+          
+          mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                  audioChunksRef.current.push(event.data);
+              }
+          };
+          
+          mediaRecorder.onstop = async () => {
+              // Stop all tracks to release microphone
+              stream.getTracks().forEach(track => track.stop());
+              
+              if (audioChunksRef.current.length > 0) {
+                  const audioBlob = new Blob(audioChunksRef.current, { 
+                      type: mediaRecorder.mimeType 
+                  });
+                  await transcribeAudio(audioBlob);
+              }
+              audioChunksRef.current = [];
+          };
+          
+          mediaRecorderRef.current = mediaRecorder;
+          mediaRecorder.start();
+          setIsRecordingAudio(true);
+          setIsListening(true);
+      } catch (err) {
+          console.error('Failed to start recording:', err);
+          if ((err as Error).name === 'NotAllowedError') {
+              alert('請允許權限以傳送夢囈 🎤');
+          } else {
+              alert('無法啟動錄音，請確認麥克風連接 🎙️');
           }
-          setIsListening(false);
+      }
+  };
+
+  // Stop voice recording
+  const stopRecording = () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+          mediaRecorderRef.current = null;
+      }
+      setIsRecordingAudio(false);
+      setIsListening(false);
+  };
+
+  // Toggle recording on/off
+  const toggleListening = () => {
+      if (isRecordingAudio) {
+          stopRecording();
       } else {
-          isListeningRef.current = true;
-          try {
-              recognitionRef.current.start();
-              setIsListening(true);
-          } catch (err) {
-              console.error('Failed to start speech recognition:', err);
-              isListeningRef.current = false;
-              setIsListening(false);
-              alert('連結失敗，請確認麥克風權限 🎤');
-          }
+          startRecording();
       }
   };
 
@@ -730,14 +701,17 @@ export default function DreamJournal() {
                  <div className="flex flex-wrap gap-2">
                     <button 
                         onClick={toggleListening}
+                        disabled={isTranscribing}
                         className={cn(
                             "flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-sm transition-all",
-                            isListening 
-                                ? "bg-red-500/20 text-red-200 border border-red-500/50 animate-pulse"
-                                : "bg-gradient-to-r from-[#67e8f9] to-[#a78bfa] text-[#001]"
+                            isTranscribing
+                                ? "bg-yellow-500/20 text-yellow-200 border border-yellow-500/50 cursor-wait"
+                                : isListening 
+                                    ? "bg-red-500/20 text-red-200 border border-red-500/50 animate-pulse"
+                                    : "bg-gradient-to-r from-[#67e8f9] to-[#a78bfa] text-[#001]"
                         )}
                     >
-                        <Mic size={14} /> {isListening ? '中斷連結' : '口述夢囈'}
+                        <Mic size={14} /> {isTranscribing ? '轉換中...' : isListening ? '停止錄音' : '錄音口述'}
                     </button>
                     <button 
                         onClick={() => {
