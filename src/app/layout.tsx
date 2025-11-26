@@ -15,6 +15,26 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Dream Record",
   description: "Record your dreams and analyze them with AI",
+  icons: {
+    icon: [
+      { url: '/dream-record-icon.png', sizes: 'any' },
+      { url: '/dream-record-icon.png', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/dream-record-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Dream Record',
+  },
+  other: {
+    'theme-color': '#0f1230',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-title': 'Dream Record',
+  },
 };
 
 export default function RootLayout({

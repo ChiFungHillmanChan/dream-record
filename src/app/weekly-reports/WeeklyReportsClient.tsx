@@ -241,10 +241,10 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
                         {/* Card Content */}
                         <div className="p-5 flex-grow flex flex-col relative -mt-6">
                           <h3 className="text-xl font-bold text-white mb-2 group-hover:text-purple-300 transition-colors line-clamp-1">
-                            {data.word_of_the_week}
+                            {cleanMarkdown(data.word_of_the_week)}
                           </h3>
                           <p className="text-slate-400 text-xs leading-relaxed line-clamp-3 mb-4 flex-grow">
-                            {data.summary}
+                            {cleanMarkdown(data.summary)}
                           </p>
                           
                           <div className="pt-4 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-500 font-medium uppercase tracking-wider">
@@ -284,12 +284,42 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
   );
 }
 
+// ...
+function cleanMarkdown(text: string) {
+  if (!text) return "";
+  return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+}
+
 function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: boolean, onBack: () => void }) {
   const data = JSON.parse(report.analysis) as WeeklyReportData;
   const startDate = new Date(report.startDate).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric' });
   const endDate = new Date(report.endDate).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric' });
 
+  // Clean up potentially legacy markdown
+  const safeData = {
+    ...data,
+    word_of_the_week: cleanMarkdown(data.word_of_the_week),
+    summary: cleanMarkdown(data.summary),
+    emotional_trajectory: cleanMarkdown(data.emotional_trajectory),
+    day_residue_analysis: cleanMarkdown(data.day_residue_analysis),
+    deep_insight: cleanMarkdown(data.deep_insight),
+    advice: cleanMarkdown(data.advice),
+    reflection_question: cleanMarkdown(data.reflection_question),
+    themes: data.themes.map(t => ({
+        ...t,
+        name: cleanMarkdown(t.name),
+        description: cleanMarkdown(t.description)
+    })),
+    archetypes: data.archetypes.map(a => ({
+        ...a,
+        name: cleanMarkdown(a.name),
+        explanation: cleanMarkdown(a.explanation)
+    }))
+  };
+
   return (
+// ... use safeData instead of data
+
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}

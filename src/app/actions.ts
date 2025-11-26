@@ -84,7 +84,7 @@ export type DreamData = {
 };
 
 export type DreamAnalysisResult = {
-  analysis: string | null;
+  analysis: { title: string; content: string }[] | null;
   vibe: string;
   reflection: string | null;
   summary: string;
@@ -280,7 +280,18 @@ export async function analyzeDream(content: string): Promise<{ result: DreamAnal
             type: 'object',
             properties: {
               summary: { type: 'string' },
-              analysis: { type: 'string' },
+              analysis: { 
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string' },
+                    content: { type: 'string' }
+                  },
+                  required: ['title', 'content'],
+                  additionalProperties: false
+                }
+              },
               vibe: { type: 'string' },
               reflection: { type: 'string' }
             },

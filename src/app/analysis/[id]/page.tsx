@@ -47,11 +47,16 @@ export default function AnalysisPage() {
 氛圍：${analysisData.vibe}`;
 
     if (analysisData.analysis) {
-      text += `
-
-深度分析：${analysisData.analysis}
-
-建議：${analysisData.reflection}`;
+      text += `\n\n深度分析：\n`;
+      if (Array.isArray(analysisData.analysis)) {
+        analysisData.analysis.forEach((item, i) => {
+             text += `\n${i + 1}. ${item.title}: ${item.content}`;
+        });
+      } else {
+        text += analysisData.analysis;
+      }
+      
+      text += `\n\n建議：${analysisData.reflection}`;
     }
 
     text += `

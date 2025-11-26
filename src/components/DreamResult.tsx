@@ -10,27 +10,36 @@ interface DreamResultProps {
 }
 
 export function DreamResult({ result }: DreamResultProps) {
-  // Helper to parse numbered lists in analysis text
-  const parseAnalysisPoints = (text: string) => {
-    if (!text) return [];
-    // Split by numbered list pattern (e.g., "1.", "2.")
-    const parts = text.split(/\n(?=\d+\.)/g);
-    return parts.map(part => {
-      const match = part.match(/^(\d+\.)\s*([\s\S]+)/);
-      if (match) {
-        // Check for bold title **Title**: Content
-        const content = match[2];
-        const titleMatch = content.match(/^\*\*(.*?)\*\*:?\s*([\s\S]*)/);
-        if (titleMatch) {
-          return { title: titleMatch[1], content: titleMatch[2] };
+  // Handle both array format (new) and string format (legacy/fallback)
+  const getAnalysisPoints = () => {
+    if (!result.analysis) return [];
+    
+    if (Array.isArray(result.analysis)) {
+      return result.analysis;
+    }
+
+    // Fallback for legacy string format
+    if (typeof result.analysis === 'string') {
+      const text = result.analysis as string;
+      const parts = text.split(/\n(?=\d+\.)/g);
+      return parts.map(part => {
+        const match = part.match(/^(\d+\.)\s*([\s\S]+)/);
+        if (match) {
+            const content = match[2];
+            const titleMatch = content.match(/^\*\*(.*?)\*\*:?\s*([\s\S]*)/);
+            if (titleMatch) {
+              return { title: titleMatch[1], content: titleMatch[2] };
+            }
+            return { title: null, content: content };
         }
-        return { title: null, content: content };
-      }
-      return { title: null, content: part.trim() };
-    }).filter(p => p.content); // Filter out empty
+        return { title: null, content: part.trim() };
+      }).filter(p => p.content);
+    }
+
+    return [];
   };
 
-  const analysisPoints = result.analysis ? parseAnalysisPoints(result.analysis) : [];
+  const analysisPoints = getAnalysisPoints();
 
   // Staggered animation variants
   const container = {
@@ -63,13 +72,13 @@ export function DreamResult({ result }: DreamResultProps) {
         
         <div className="relative z-10">
           <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-200 to-rose-200 mb-6 flex items-center gap-2">
-            <Sparkles className="text-orange-300" /> 夢境解析報告
+            <Sparkles className="text-orange-300" /> 天機解讀報告
           </h2>
           
           {/* Summary Box */}
           <div className="bg-white/10 rounded-xl p-5 border border-white/10 backdrop-blur-sm mb-4">
              <h3 className="text-sm font-bold text-orange-200 mb-2 flex items-center gap-2 uppercase tracking-wider">
-                <Quote size={14} /> 夢境摘要
+                <Quote size={14} /> 夢境殘片
              </h3>
              <p className="text-lg text-indigo-50 leading-relaxed font-medium">
                {result.summary}
@@ -89,7 +98,7 @@ export function DreamResult({ result }: DreamResultProps) {
       {result.analysis ? (
         <div className="space-y-4">
            <motion.h3 variants={item} className="text-lg font-bold text-indigo-200 pl-3 border-l-4 border-orange-400 flex items-center gap-2">
-              <Lightbulb size={20} className="text-orange-400" /> 深度解讀
+              <Lightbulb size={20} className="text-orange-400" /> 天機剖析
            </motion.h3>
            
            <div className="grid gap-4">
@@ -119,7 +128,8 @@ export function DreamResult({ result }: DreamResultProps) {
                ))
              ) : (
                <motion.div variants={item} className="bg-[#1e1b4b]/60 rounded-xl p-5 text-indigo-100 whitespace-pre-wrap leading-relaxed">
-                 {result.analysis}
+                 {/* Handle string fallback if array is empty but analysis string exists */}
+                 {typeof result.analysis === 'string' ? result.analysis : "暫無詳細分析"}
                </motion.div>
              )}
            </div>
@@ -134,9 +144,9 @@ export function DreamResult({ result }: DreamResultProps) {
                     <Lock size={24} />
                 </div>
                 <div>
-                    <h3 className="text-xl font-bold text-gray-200 mb-2">解鎖深度解析</h3>
+                    <h3 className="text-xl font-bold text-gray-200 mb-2">解鎖天機</h3>
                     <p className="text-gray-400 max-w-md mx-auto text-sm">
-                        升級到深度版，獲取完整的心理學分析與建議，深入探索潛意識的訊息。
+                        升級到深度版，獲取完整的周公解夢與心理分析，深入探索潛意識的訊息。
                     </p>
                 </div>
                 <Link href="/settings" className="mt-2 px-8 py-2.5 bg-gradient-to-r from-orange-500 to-rose-500 rounded-full text-white font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-105 transition-all">
@@ -153,7 +163,7 @@ export function DreamResult({ result }: DreamResultProps) {
                 <Heart size={80} />
             </div>
             <h3 className="text-emerald-300 font-bold mb-4 flex items-center gap-2 text-lg relative z-10">
-                <Heart className="text-emerald-400 fill-emerald-400/20" size={20} /> 療癒建議
+                <Heart className="text-emerald-400 fill-emerald-400/20" size={20} /> 心靈指引
             </h3>
             <div className="relative z-10">
                 <p className="text-emerald-50 whitespace-pre-line leading-relaxed text-base/loose">

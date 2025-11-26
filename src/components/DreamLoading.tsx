@@ -8,11 +8,11 @@ export function DreamLoading() {
   const [messageIndex, setMessageIndex] = useState(0);
   
   const messages = [
-    "正在連結潛意識...",
-    "解讀夢境符號...",
-    "分析情緒脈絡...",
-    "探索隱藏的訊息...",
-    "編織解析結果..."
+    "正在連結靈魂深處...",
+    "解讀天機符號...",
+    "感應情緒脈絡...",
+    "聆聽潛意識的低語...",
+    "揭示命運的啟示..."
   ];
 
   useEffect(() => {

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Mic, RotateCcw, Search, Trash2, Edit2, 
   ChevronLeft, ChevronRight,
-  Download, Upload, Settings, Shield, Crown, Lock, Sparkles
+  Download, Upload, Settings, Shield, Crown, Sparkles
 } from 'lucide-react';
 import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo, getRemainingFreeAnalyses, getWeeklyReports, WeeklyReportData, hasNoDreamForDate } from '@/app/actions';
 import { ROLES, PLANS } from '@/lib/constants';
@@ -13,6 +13,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { DreamLoading } from '@/components/DreamLoading';
 import { DreamResult } from '@/components/DreamResult';
@@ -198,15 +199,15 @@ export default function DreamJournal() {
             recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
                 console.error('Speech recognition error:', event.error);
                 if (event.error === 'not-allowed') {
-                    alert('請允許麥克風權限以使用語音輸入 🎤');
+                    alert('請允許權限以傳送夢囈 🎤');
                     isListeningRef.current = false;
                     setIsListening(false);
                 } else if (event.error === 'network') {
-                    alert('網絡連接出現問題，請檢查網絡設定 🌐');
+                    alert('靈界連結中斷，請檢查網絡 🌐');
                     isListeningRef.current = false;
                     setIsListening(false);
                 } else if (event.error === 'audio-capture') {
-                    alert('搵唔到麥克風，請確認麥克風已連接 🎙️');
+                    alert('尋不到傳音法器（麥克風），請確認連接 🎙️');
                     isListeningRef.current = false;
                     setIsListening(false);
                 }
@@ -235,7 +236,7 @@ export default function DreamJournal() {
 
   const toggleListening = () => {
       if (!recognitionRef.current) {
-          alert('呢個瀏覽器唔支援語音輸入 😢\n建議用 Chrome 或者 Edge 瀏覽器');
+          alert('此法器（瀏覽器）無法接收夢囈 😢\n建議更換 Chrome 或 Edge');
           return;
       }
       if (isListening) {
@@ -255,7 +256,7 @@ export default function DreamJournal() {
               console.error('Failed to start speech recognition:', err);
               isListeningRef.current = false;
               setIsListening(false);
-              alert('語音輸入啟動失敗，請確認麥克風權限已開啟 🎤');
+              alert('連結失敗，請確認麥克風權限 🎤');
           }
       }
   };
@@ -317,7 +318,7 @@ export default function DreamJournal() {
       setAnalysisResult(null);
       loadDreams();
     } else {
-      alert(res.error ?? '保存失敗');
+      alert(res.error ?? '封存失敗');
     }
   };
 
@@ -430,9 +431,9 @@ export default function DreamJournal() {
                   });
               }
               loadDreams();
-              alert('匯入完成');
+              alert('記憶匯入完成');
           } catch (err) {
-              alert('匯入失敗');
+              alert('記憶匯入失敗');
               console.error(err);
           }
       };
@@ -523,10 +524,10 @@ export default function DreamJournal() {
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center">
                   <span className="text-3xl">🗑️</span>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">等等，諗清楚先！</h3>
+                <h3 className="text-xl font-bold text-white mb-2">等等...</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  你確定要清空依家寫低嘅野？<br />
-                  清空咗就冇得返轉頭㗎喇 🥺
+                  你確定要讓這些記憶煙消雲散？<br />
+                  一旦遺忘，就再也找不回這些碎片了。
                 </p>
               </div>
               
@@ -535,7 +536,7 @@ export default function DreamJournal() {
                   onClick={() => setShowClearConfirm(false)}
                   className="flex-1 py-3 px-4 rounded-xl border border-[var(--border)] text-slate-300 font-medium hover:bg-white/5 transition-colors"
                 >
-                  唔好住 😅
+                  保留記憶
                 </button>
                 <button
                   onClick={() => {
@@ -545,7 +546,7 @@ export default function DreamJournal() {
                   }}
                   className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold hover:opacity-90 transition-opacity"
                 >
-                  清空佢 💨
+                  徹底遺忘 💨
                 </button>
               </div>
             </motion.div>
@@ -555,18 +556,25 @@ export default function DreamJournal() {
       {/* Header */}
       <header className="flex items-center justify-between p-3 border border-[var(--border)] rounded-2xl bg-[var(--surface)] mb-3 relative z-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-radial from-white via-[#d9d9ff] to-[var(--accent)] shadow-[0_0_12px_rgba(167,139,250,0.5)]" />
+          <Image 
+            src="/dream-record-icon.png" 
+            alt="Dream Record" 
+            width={40}
+            height={40}
+            className="w-10 h-10 rounded-full object-cover shadow-[0_0_12px_rgba(167,139,250,0.5)]"
+            priority
+          />
           <div>
             <div className="font-bold text-base">{currentUser?.name || '夢境紀錄器'}</div>
-            <div className="text-xs text-[var(--muted)]">{todayStr || '載入中...'} · 醒來就記下夢的碎片吧</div>
+            <div className="text-xs text-[var(--muted)]">{todayStr || '載入中...'} · 在遺忘之前，將潛意識封存。</div>
           </div>
         </div>
         
         <div className="flex items-center gap-3">
             <div className="hidden md:flex flex-wrap items-center gap-3 p-2.5 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)]">
                 <div>
-                    <div className="text-2xl font-extrabold tracking-wide">{getStreak()} 日</div>
-                    <div className="text-xs text-[var(--muted)]">連續紀錄</div>
+                    <div className="text-2xl font-bold tracking-wide">{getStreak()} 日</div>
+                    <div className="text-xs text-[var(--muted)]">修煉日數</div>
                 </div>
                 {renderStreakGrid()}
             </div>
@@ -608,7 +616,7 @@ export default function DreamJournal() {
           )}
         >
           <Edit2 size={16} />
-          <span>記錄</span>
+          <span>入夢</span>
         </button>
         <button 
           onClick={() => setActiveTab('history')}
@@ -618,7 +626,7 @@ export default function DreamJournal() {
           )}
         >
           <RotateCcw size={16} />
-          <span>歷史</span>
+          <span>夢迴</span>
         </button>
       </div>
 
@@ -631,13 +639,13 @@ export default function DreamJournal() {
             exit={{ opacity: 0, y: -10 }}
             className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4"
           >
-            <h2 className="text-lg mb-3 font-bold">今天的夢境</h2>
+            <h2 className="text-lg mb-3 font-bold">捕捉殘片</h2>
             <div className="grid md:grid-cols-[1.1fr_0.9fr] gap-4">
               <div className="flex flex-col gap-2">
                  <textarea
                    value={dreamText}
                    onChange={(e) => setDreamText(e.target.value)}
-                   placeholder="剛醒來？把夢境碎片記下來..."
+                   placeholder="在意識模糊之際，你記起了什麼...？"
                    className="w-full min-h-[180px] p-3 rounded-xl bg-[#0f1230] border border-[var(--border)] focus:outline-none focus:border-[var(--accent2)] resize-none"
                  />
                  <div className="flex flex-wrap gap-2">
@@ -650,7 +658,7 @@ export default function DreamJournal() {
                                 : "bg-gradient-to-r from-[#67e8f9] to-[#a78bfa] text-[#001]"
                         )}
                     >
-                        <Mic size={14} /> {isListening ? '停止收聽' : '語音輸入'}
+                        <Mic size={14} /> {isListening ? '中斷連結' : '口述夢囈'}
                     </button>
                     <button 
                         onClick={() => {
@@ -660,7 +668,7 @@ export default function DreamJournal() {
                         }}
                         className="px-3 py-2 rounded-xl border border-[var(--border)] text-[var(--muted)] text-sm hover:bg-white/5"
                     >
-                        清空
+                        遺忘
                     </button>
                      <button 
                         onClick={handleAnalyze}
@@ -668,7 +676,7 @@ export default function DreamJournal() {
                         className="px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
                     >
                         <Sparkles size={14} />
-                        {isAnalyzing ? '分析中...' : 'AI 解析'}
+                        {isAnalyzing ? '感應中...' : '解讀天機'}
                         {currentUser && (
                           <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
                             {(currentUser.plan === PLANS.DEEP || currentUser.role === ROLES.SUPERADMIN) ? '∞' : remainingAnalyses}
@@ -755,7 +763,7 @@ export default function DreamJournal() {
 
             <div className="flex gap-3 mt-6">
                 <button onClick={() => handleSave('dream')} className="flex-1 py-3 rounded-xl bg-gradient-to-br from-[var(--accent2)] to-[var(--accent)] text-white font-bold shadow-lg shadow-purple-900/30 active:scale-95 transition-transform">
-                    保存今天的夢 ✨
+                    封存夢境 🔮
                 </button>
                 <button 
                     onClick={() => handleSave('no_dream')} 
@@ -766,9 +774,9 @@ export default function DreamJournal() {
                             ? "border-green-500/30 bg-green-500/10 text-green-400 cursor-not-allowed" 
                             : "border-[var(--border)] text-[var(--muted)] hover:bg-white/5 active:scale-95"
                     )}
-                    title={hasNoDreamToday ? "今日已記錄冇發夢" : undefined}
+                    title={hasNoDreamToday ? "已記錄無夢" : undefined}
                 >
-                    {hasNoDreamToday ? "已記錄冇發夢 ✓" : "今天冇發夢 😴"}
+                    {hasNoDreamToday ? "虛無已記 ✓" : "一夜無夢 🌑"}
                 </button>
             </div>
           </motion.section>
@@ -890,7 +898,6 @@ export default function DreamJournal() {
                     {(() => {
                         const days = getDaysInWeek(currentDate);
                         const weekStart = days[0].toISOString().split('T')[0];
-                        const weekEnd = days[6].toISOString().split('T')[0];
                         
                         const report = weeklyReports.find(r => {
                             const rStart = new Date(r.startDate).toISOString().split('T')[0];
