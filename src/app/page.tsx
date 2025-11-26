@@ -484,7 +484,7 @@ export default function DreamJournal() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-radial from-white via-[#d9d9ff] to-[var(--accent)] shadow-[0_0_12px_rgba(167,139,250,0.5)]" />
           <div>
-            <div className="font-bold text-base">{currentUser?.name || 'Dream Record'}</div>
+            <div className="font-bold text-base">{currentUser?.name || '夢境紀錄器'}</div>
             <div className="text-xs text-[var(--muted)]">{todayStr || '載入中...'} · 醒來就記下夢的碎片吧</div>
           </div>
         </div>
@@ -820,7 +820,7 @@ export default function DreamJournal() {
                                         <div className="absolute inset-0 opacity-30 group-hover:opacity-40 transition-opacity">
                                             <img 
                                                 src={`data:image/png;base64,${report.imageBase64}`} 
-                                                alt="Weekly Viz" 
+                                                alt="每週夢境圖" 
                                                 className="w-full h-full object-cover blur-sm group-hover:blur-none transition-all duration-700"
                                             />
                                             <div className="absolute inset-0 bg-gradient-to-t from-[#0f1230] via-[#0f1230]/80 to-transparent" />
@@ -830,14 +830,14 @@ export default function DreamJournal() {
                                     <div className="relative p-6 flex flex-col md:flex-row gap-6 items-start md:items-center">
                                         <div className="flex-1">
                                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-bold uppercase tracking-wider mb-3">
-                                                <Sparkles size={12} /> Weekly Insight
+                                                <Sparkles size={12} /> 每週洞察
                                             </div>
                                             <h3 className="text-2xl font-bold text-white mb-2">{data.word_of_the_week}</h3>
                                             <p className="text-slate-300 text-sm line-clamp-2">{data.summary}</p>
                                         </div>
                                         <div className="flex items-center justify-center w-full md:w-auto">
                                             <div className="px-4 py-2 rounded-xl bg-white/10 backdrop-blur border border-white/10 text-white text-xs font-bold group-hover:bg-white/20 transition-all">
-                                                View Report
+                                                查看報告
                                             </div>
                                         </div>
                                     </div>
@@ -867,7 +867,7 @@ export default function DreamJournal() {
                                     
                                     <div className="mb-2 flex items-baseline gap-2">
                                         <span className="font-bold text-white">{day.getMonth() + 1}/{day.getDate()}</span>
-                                        <span className="text-xs text-slate-500">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()]}</span>
+                                        <span className="text-xs text-slate-500">{['日', '一', '二', '三', '四', '五', '六'][day.getDay()]}</span>
                                     </div>
 
                                     {dayDreams.length > 0 ? (
@@ -876,7 +876,7 @@ export default function DreamJournal() {
                                                 <div key={dream.id} onClick={() => { setSelectedDateStr(dateStr); setCalendarMode('day'); }} className="cursor-pointer group bg-[#1a1d3d] hover:bg-[#23264d] p-4 rounded-xl border border-white/5 transition-all">
                                                     <div className="flex justify-between items-start mb-2">
                                                         <span className="text-xs text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded">
-                                                            {dream.type === 'dream' ? 'Dream' : 'No Dream'}
+                                                            {dream.type === 'dream' ? '有夢' : '無夢'}
                                                         </span>
                                                         {dream.analysis && <Sparkles size={12} className="text-amber-400" />}
                                                     </div>
@@ -894,7 +894,7 @@ export default function DreamJournal() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="text-xs text-slate-600 italic">No records</div>
+                                        <div className="text-xs text-slate-600 italic">未有記錄</div>
                                     )}
                                 </div>
                             );
@@ -953,7 +953,7 @@ export default function DreamJournal() {
                                                 href={`/analysis/${dream.id}`}
                                                 className="flex items-center justify-center gap-2 w-full py-2.5 mt-2 rounded-lg bg-[#1e1b4b] hover:bg-[#2e1065] text-indigo-200 text-xs font-bold border border-indigo-500/20 transition-all group-hover/card:border-indigo-500/50 group-hover/card:shadow-lg group-hover/card:shadow-indigo-500/10"
                                             >
-                                                <Sparkles size={12} /> 查看完整報告 (Full Report)
+                                                <Sparkles size={12} /> 查看完整報告
                                             </Link>
                                         </div>
                                     );

@@ -135,9 +135,9 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
           animate={{ opacity: 1, y: 0 }}
           className="bg-gradient-to-r from-purple-500/20 to-amber-500/20 backdrop-blur-xl border border-purple-500/30 rounded-3xl p-6 shadow-xl mb-6"
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500/20 rounded-xl">
+              <div className="p-2 bg-purple-500/20 rounded-xl shrink-0">
                 <Crown className="w-6 h-6 text-purple-400" />
               </div>
               <div>
@@ -148,7 +148,7 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
             <button
               onClick={handleSetupSuperAdmin}
               disabled={isSettingUpAdmin}
-              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-amber-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+              className="w-full md:w-auto justify-center px-4 py-2 bg-gradient-to-r from-purple-500 to-amber-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2 shrink-0"
             >
               {isSettingUpAdmin ? (
                 <>
@@ -178,9 +178,9 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
           animate={{ opacity: 1, y: 0 }}
           className="bg-amber-500/10 backdrop-blur-xl border border-amber-500/20 rounded-3xl p-6 shadow-xl mb-6"
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500/20 rounded-xl">
+              <div className="p-2 bg-amber-500/20 rounded-xl shrink-0">
                 <Shield className="w-6 h-6 text-amber-400" />
               </div>
               <div>
@@ -190,7 +190,7 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
             </div>
             <Link
               href="/admin"
-              className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded-xl transition-colors flex items-center gap-2"
+              className="w-full md:w-auto justify-center px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded-xl transition-colors flex items-center gap-2 shrink-0"
             >
               <Shield className="w-4 h-4" />
               管理控制台
@@ -437,15 +437,15 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
 
         <div className="mt-12 pt-8 border-t border-white/10">
           <h3 className="text-lg font-semibold text-red-400 mb-4">危險區域</h3>
-          <div className="flex items-center justify-between p-4 bg-red-500/5 border border-red-500/10 rounded-xl">
+          <div className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-red-500/5 border border-red-500/10 rounded-xl gap-4">
             <div>
-              <p className="text-white font-medium">刪除帳號</p>
+              <p className="text-white font-medium mb-1">刪除帳號</p>
               <p className="text-sm text-gray-400">一旦你刪除帳號，將無法復原。請確定要執行此操作。</p>
             </div>
-            <form action={deleteAction}>
+            <form action={deleteAction} className="w-full md:w-auto shrink-0">
                 <button 
                     disabled={isDeletePending}
-                    className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                    className="w-full md:w-auto justify-center bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
                     onClick={(e) => {
                         if (!confirm('你確定要刪除帳號嗎？此操作無法復原。')) {
                             e.preventDefault();

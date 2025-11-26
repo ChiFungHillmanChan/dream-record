@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateWeeklyReport, WeeklyReportData, WeeklyReportStatus } from '@/app/actions';
 import { PLANS } from '@/lib/constants';
-import { Loader2, Lock, Sparkles, ArrowLeft, Brain, Heart, Zap, Crown, FileText, ChevronRight, Quote, Fingerprint, X, Calendar } from 'lucide-react';
+import { Loader2, Lock, Sparkles, ArrowLeft, Brain, Heart, Zap, Crown, FileText, ChevronRight, Quote, Fingerprint, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import type { WeeklyReport } from '@prisma/client';
 
@@ -106,7 +106,7 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
                       週夢解析
                     </h1>
                     <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mt-1">
-                      Subconscious Architecture
+                      潛意識架構
                     </p>
                   </div>
                 </div>
@@ -130,7 +130,7 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
                         {reportStatus && (
                            <div className="space-y-3 mb-6 bg-black/20 p-4 rounded-xl border border-white/5">
                              <div className="flex justify-between text-xs font-medium uppercase tracking-wider text-slate-400">
-                               <span>Quota</span>
+                               <span>每週配額</span>
                                <span className={reportStatus.reportsUsed >= reportStatus.reportsLimit ? 'text-amber-400' : 'text-white'}>
                                  {reportStatus.reportsUsed} / {reportStatus.reportsLimit}
                                </span>
@@ -316,7 +316,7 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
          {/* Header Section */}
          <div className="relative p-8 md:p-12 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[10px] font-bold tracking-widest uppercase mb-6">
-              <Sparkles className="w-3 h-3" /> Weekly Analysis
+              <Sparkles className="w-3 h-3" /> 每週分析
             </div>
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 tracking-tight">
               {data.word_of_the_week}
@@ -332,13 +332,13 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
             <div className="md:w-[35%] border-r border-white/5 bg-black/20 p-6 md:p-8 space-y-8">
                {/* Visualization */}
                <div className="space-y-4">
-                 <h3 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">Visual Synthesis</h3>
+                 <h3 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">夢境映像</h3>
                  <div className="aspect-square w-full rounded-2xl overflow-hidden border border-white/10 relative group bg-black/40">
                     {report.imageBase64 ? (
                       <>
                         <img 
                           src={`data:image/png;base64,${report.imageBase64}`} 
-                          alt="Dream Visualization" 
+                          alt="夢境映像" 
                           className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -361,7 +361,7 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
                  </h3>
                  <div className="bg-white/5 p-4 rounded-xl border border-white/5">
                    <p className="text-sm text-slate-300 leading-relaxed italic">
-                     "{data.emotional_trajectory}"
+                     &quot;{data.emotional_trajectory}&quot;
                    </p>
                  </div>
                </div>
@@ -457,7 +457,7 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
                       <div className="pt-6 border-t border-white/10">
                         <h4 className="text-xs font-bold text-blue-400 mb-3">反思問題</h4>
                         <p className="text-lg text-white italic font-serif opacity-90">
-                          "{data.reflection_question}"
+                          &quot;{data.reflection_question}&quot;
                         </p>
                       </div>
                     </div>
@@ -474,7 +474,7 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
 function PremiumLockOverlay({ dark = false }: { dark?: boolean }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-       <div className="bg-black/80 backdrop-blur-xl p-6 rounded-2xl border border-white/10 text-center max-w-xs shadow-2xl pointer-events-auto">
+       <div className={`backdrop-blur-xl p-6 rounded-2xl border border-white/10 text-center max-w-xs shadow-2xl pointer-events-auto ${dark ? 'bg-black/90' : 'bg-black/80'}`}>
          <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
            <Lock className="w-5 h-5 text-amber-400" />
          </div>
