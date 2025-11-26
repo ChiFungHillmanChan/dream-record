@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { signJWT, verifyJWT, SessionPayload } from './jwt';
 
 export async function hashPassword(password: string): Promise<string> {
@@ -13,7 +13,22 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 export { signJWT, verifyJWT };
 export type { SessionPayload };
 
+/**
+ * Get session from either:
+ * 1. Authorization: Bearer <token> header (for mobile/API clients)
+ * 2. session_token cookie (for web clients)
+ */
 export async function getSession(): Promise<SessionPayload | null> {
+  // First, try to get token from Authorization header (for mobile/API clients)
+  const headerStore = await headers();
+  const authHeader = headerStore.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const session = await verifyJWT(token);
+    if (session) return session;
+  }
+
+  // Fall back to cookie-based session (for web clients)
   const cookieStore = await cookies();
   const token = cookieStore.get('session_token')?.value;
   if (!token) return null;

@@ -1,0 +1,62 @@
+name: dream_record_mobile
+description: Dream Record - A mystical dream journal app
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # HTTP & Networking
+  dio: ^5.4.0
+  
+  # State Management
+  provider: ^6.1.1
+  
+  # Navigation
+  go_router: ^13.2.0
+  
+  # Secure Storage
+  flutter_secure_storage: ^9.0.0
+  
+  # Date/Time
+  intl: ^0.18.1
+  
+  # Audio Recording
+  record: ^5.0.4
+  path_provider: ^2.1.2
+  
+  # UI Components
+  table_calendar: ^3.0.9
+  
+  # JSON Serialization
+  json_annotation: ^4.8.1
+  
+  # Icons
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+  build_runner: ^2.4.8
+  json_serializable: ^6.7.1
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+
+  fonts:
+    - family: NotoSansTC
+      fonts:
+        - asset: assets/fonts/NotoSansTC-Regular.ttf
+        - asset: assets/fonts/NotoSansTC-Bold.ttf
+          weight: 700
+
