@@ -143,6 +143,31 @@ export async function saveDream(data: DreamData): Promise<{ success: boolean; er
     const { id, tags, analysis, ...rest } = data;
     const tagsJson = JSON.stringify(tags);
 
+    // If saving a real dream, automatically remove any 'no_dream' entries for the same day
+    if (data.type === 'dream') {
+      await prisma.dream.deleteMany({
+        where: {
+          userId: session.userId as string,
+          date: data.date,
+          type: 'no_dream',
+        },
+      });
+    }
+
+    // If saving a 'no_dream' entry, check if one already exists for today
+    if (data.type === 'no_dream' && !id) {
+      const existingNoDream = await prisma.dream.findFirst({
+        where: {
+          userId: session.userId as string,
+          date: data.date,
+          type: 'no_dream',
+        },
+      });
+      if (existingNoDream) {
+        return { success: false, error: '今日已經記錄咗冇發夢喇' };
+      }
+    }
+
     if (id) {
       // Verify ownership
       const existing = await prisma.dream.findUnique({ where: { id } });
@@ -707,4 +732,20 @@ export async function getRemainingFreeAnalyses(): Promise<number> {
   if (user.plan === PLANS.DEEP || user.role === ROLES.SUPERADMIN) return -1; // -1 means unlimited (DEEP users and SUPERADMIN)
 
   return Math.max(0, FREE_ANALYSIS_LIMIT - user.lifetimeAnalysisCount);
+}
+
+// Check if user has already recorded "no dream" for a specific date
+export async function hasNoDreamForDate(date: string): Promise<boolean> {
+  const session = await getSession();
+  if (!session?.userId) return false;
+
+  const existingNoDream = await prisma.dream.findFirst({
+    where: {
+      userId: session.userId as string,
+      date: date,
+      type: 'no_dream',
+    },
+  });
+
+  return !!existingNoDream;
 }

@@ -2,6 +2,9 @@ import { getWeeklyReports, getCurrentUser, getWeeklyReportStatus } from '@/app/a
 import WeeklyReportsClient from './WeeklyReportsClient';
 import { redirect } from 'next/navigation';
 
+// Force dynamic rendering to ensure fresh plan data after upgrade
+export const dynamic = 'force-dynamic';
+
 export default async function WeeklyReportsPage() {
   const user = await getCurrentUser();
   if (!user) {

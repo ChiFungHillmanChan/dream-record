@@ -92,61 +92,107 @@ export default function AnalysisPage() {
     setIsCapturing(true);
     
     try {
-      // Wait a bit for the UI to settle or any animations to pause if needed
+      // Wait a bit for the UI to settle
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Capture the content as an image
+      // Capture the content as an image with Safari-friendly settings
       const canvas = await html2canvas(captureRef.current, {
-        backgroundColor: '#0a0a0f', // Match the dark background
-        scale: 2, // Higher quality
+        backgroundColor: '#0a0a0f',
+        scale: window.devicePixelRatio > 1 ? 2 : 1, // Adaptive scale for mobile
         useCORS: true,
         logging: false,
         allowTaint: true,
+        // Safari-specific fixes
+        foreignObjectRendering: false, // Disable for better Safari compatibility
+        removeContainer: true,
       });
       
-      // Convert to blob
+      // Convert to blob with JPEG fallback for Safari (smaller file, better compatibility)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const mimeType = isIOS ? 'image/jpeg' : 'image/png';
+      const quality = isIOS ? 0.9 : 1.0;
+      const extension = isIOS ? 'jpg' : 'png';
+      
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((b) => {
           if (b) resolve(b);
           else reject(new Error('Failed to create blob'));
-        }, 'image/png', 1.0);
+        }, mimeType, quality);
       });
       
-      // Create file from blob
-      const file = new File([blob], 'dream-analysis.png', { type: 'image/png' });
+      const fileName = `dream-analysis-${new Date().toISOString().split('T')[0]}.${extension}`;
       
-      // Check if Web Share API supports files (Mobile/Tablet mostly)
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          title: '我的夢境解析',
-          text: '來看看我的夢境解析報告！',
-          files: [file]
-        });
-        setShareSuccess(true);
-      } else {
-        // Fallback: download the image (Desktop)
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `dream-analysis-${new Date().toISOString().split('T')[0]}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setShareSuccess(true);
+      // Try Web Share API first (for mobile)
+      if (navigator.share) {
+        try {
+          // Create file for sharing
+          const file = new File([blob], fileName, { type: mimeType });
+          
+          // Check if file sharing is supported
+          const canShareFiles = navigator.canShare?.({ files: [file] }) ?? false;
+          
+          if (canShareFiles) {
+            await navigator.share({
+              title: '我的夢境解析',
+              text: '來看看我的夢境解析報告！',
+              files: [file]
+            });
+            setShareSuccess(true);
+            setTimeout(() => setShareSuccess(false), 2000);
+            return;
+          }
+          
+          // Fallback: share without file (text only) - works on Safari
+          await navigator.share({
+            title: '我的夢境解析',
+            text: '來看看我的夢境解析報告！\n\n由 Dream Record 生成',
+            url: window.location.href
+          });
+          
+          // Also trigger download so user has the image
+          downloadImage(blob, fileName);
+          setShareSuccess(true);
+          setTimeout(() => setShareSuccess(false), 2000);
+          return;
+        } catch (shareError) {
+          // If share was cancelled, don't show error
+          if ((shareError as Error).name === 'AbortError') {
+            return;
+          }
+          // Fall through to download fallback
+        }
       }
       
+      // Final fallback: just download the image
+      downloadImage(blob, fileName);
+      setShareSuccess(true);
       setTimeout(() => setShareSuccess(false), 2000);
 
     } catch (err) {
-      // User cancelled or error
-      if ((err as Error).name !== 'AbortError') {
-        console.error('Share failed:', err);
-        alert('分享失敗，請稍後再試');
-      }
+      console.error('Share failed:', err);
+      // Show user-friendly message
+      alert('分享失敗，請嘗試長按圖片保存後分享');
     } finally {
       setIsCapturing(false);
     }
+  };
+  
+  // Helper function to download image
+  const downloadImage = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    // For iOS Safari, we need to open in new tab instead of download
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+    }
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Delay URL revocation for iOS Safari
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const handleClose = () => {

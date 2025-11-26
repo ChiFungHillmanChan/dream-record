@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { Sparkles, Moon, Cloud, Star } from 'lucide-react';
+import { Moon } from 'lucide-react';
 
 export function DreamLoading() {
   const [messageIndex, setMessageIndex] = useState(0);
@@ -20,86 +20,133 @@ export function DreamLoading() {
       setMessageIndex((prev) => (prev + 1) % messages.length);
     }, 2500);
     return () => clearInterval(timer);
-  }, []);
+  }, [messages.length]);
 
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#050511]/90 backdrop-blur-md"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#050511]/95"
     >
-      {/* Background Elements */}
+      {/* Optimized Background - using CSS gradients instead of blur */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-600/20 rounded-full blur-[100px]" />
-        <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-[120px]" />
+        <div 
+          className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full opacity-30"
+          style={{
+            background: 'radial-gradient(circle, rgba(147,51,234,0.4) 0%, transparent 70%)',
+          }}
+        />
+        <div 
+          className="absolute bottom-1/3 right-1/4 w-96 h-96 rounded-full opacity-25"
+          style={{
+            background: 'radial-gradient(circle, rgba(59,130,246,0.4) 0%, transparent 70%)',
+          }}
+        />
       </div>
 
-      {/* Main Animation */}
-      <div className="relative w-40 h-40 mb-12 flex items-center justify-center">
-        {/* Outer Ring */}
-        <motion.div 
-          animate={{ rotate: 360 }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-0 rounded-full border border-purple-500/30 border-t-purple-400 border-r-transparent"
+      {/* Main Animation - CSS-based for better mobile performance */}
+      <div className="relative w-32 h-32 mb-10 flex items-center justify-center">
+        {/* Outer Ring - CSS Animation */}
+        <div 
+          className="absolute inset-0 rounded-full border border-purple-500/40 border-t-purple-400 animate-spin-slow"
+          style={{ willChange: 'transform' }}
         />
         
-        {/* Middle Ring */}
-        <motion.div 
-          animate={{ rotate: -360 }}
-          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-2 rounded-full border border-blue-500/30 border-b-blue-400 border-l-transparent"
+        {/* Middle Ring - CSS Animation (reverse) */}
+        <div 
+          className="absolute inset-2 rounded-full border border-blue-500/40 border-b-blue-400 animate-spin-reverse"
+          style={{ willChange: 'transform' }}
         />
 
-        {/* Inner Orb */}
-        <motion.div 
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 shadow-[0_0_40px_rgba(124,58,237,0.5)] flex items-center justify-center relative overflow-hidden"
+        {/* Inner Orb - CSS pulse animation */}
+        <div 
+          className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center relative overflow-hidden animate-pulse-gentle"
+          style={{ 
+            boxShadow: '0 0 30px rgba(124,58,237,0.4)',
+            willChange: 'transform',
+          }}
         >
-            <motion.div 
-                animate={{ opacity: [0.4, 0.8, 0.4] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="absolute inset-0 bg-gradient-to-t from-black/20 to-white/20"
-            />
-            <Moon className="text-white/90 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]" size={40} />
-        </motion.div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-white/10" />
+          <Moon 
+            className="text-white/90 relative z-10" 
+            size={32} 
+            style={{ filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.4))' }}
+          />
+        </div>
 
-        {/* Orbiting Star */}
-        <motion.div 
-          animate={{ rotate: 360 }}
-          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-[-20px]"
+        {/* Orbiting Dot - CSS Animation */}
+        <div 
+          className="absolute inset-[-16px] animate-orbit"
+          style={{ willChange: 'transform' }}
         >
-          <div className="w-4 h-4 bg-yellow-200 rounded-full blur-[2px] shadow-[0_0_10px_rgba(253,224,71,0.8)] absolute top-0 left-1/2 -translate-x-1/2" />
-        </motion.div>
+          <div 
+            className="w-3 h-3 bg-yellow-200 rounded-full absolute top-0 left-1/2 -translate-x-1/2"
+            style={{ boxShadow: '0 0 8px rgba(253,224,71,0.7)' }}
+          />
+        </div>
       </div>
 
-      {/* Text Animation */}
+      {/* Text Animation - Minimal motion for smoothness */}
       <div className="relative z-10 h-8 overflow-hidden text-center">
         <motion.p 
           key={messageIndex}
-          initial={{ y: 20, opacity: 0 }}
+          initial={{ y: 16, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -20, opacity: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-lg md:text-xl font-medium text-purple-200 tracking-widest"
+          exit={{ y: -16, opacity: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="text-base md:text-lg font-medium text-purple-200 tracking-widest"
         >
           {messages[messageIndex]}
         </motion.p>
       </div>
       
-      <motion.div 
-        initial={{ width: 0 }}
-        animate={{ width: "200px" }}
-        transition={{ duration: 10, repeat: Infinity }}
-        className="h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent mt-4"
-      />
+      {/* Progress bar - CSS animation */}
+      <div className="w-48 h-0.5 bg-white/10 rounded-full mt-4 overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-purple-500/50 via-purple-500 to-purple-500/50 animate-progress-bar"
+          style={{ willChange: 'transform' }}
+        />
+      </div>
 
+      {/* CSS Animations - defined inline for better tree-shaking */}
+      <style jsx global>{`
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes spin-reverse {
+          from { transform: rotate(360deg); }
+          to { transform: rotate(0deg); }
+        }
+        @keyframes orbit {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes pulse-gentle {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+        @keyframes progress-bar {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+        .animate-spin-slow {
+          animation: spin-slow 12s linear infinite;
+        }
+        .animate-spin-reverse {
+          animation: spin-reverse 10s linear infinite;
+        }
+        .animate-orbit {
+          animation: orbit 6s linear infinite;
+        }
+        .animate-pulse-gentle {
+          animation: pulse-gentle 2.5s ease-in-out infinite;
+        }
+        .animate-progress-bar {
+          animation: progress-bar 2s ease-in-out infinite;
+        }
+      `}</style>
     </motion.div>
   );
 }
-
-
-
-

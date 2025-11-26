@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight,
   Download, Upload, Settings, Shield, Crown, Lock, Sparkles
 } from 'lucide-react';
-import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo, getRemainingFreeAnalyses, getWeeklyReports, WeeklyReportData } from '@/app/actions';
+import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo, getRemainingFreeAnalyses, getWeeklyReports, WeeklyReportData, hasNoDreamForDate } from '@/app/actions';
 import { ROLES, PLANS } from '@/lib/constants';
 import type { Dream, WeeklyReport } from '@prisma/client';
 import { clsx } from 'clsx';
@@ -146,6 +146,7 @@ export default function DreamJournal() {
   const [selectedDateStr, setSelectedDateStr] = useState(new Date().toISOString().split('T')[0]);
   const importRef = useRef<HTMLInputElement>(null);
   const [todayStr, setTodayStr] = useState('');
+  const [hasNoDreamToday, setHasNoDreamToday] = useState(false);
 
   // Constants
   const defaultTags = ['開心','可怕','感動','親情','離世','奇幻','追逐','飛翔','戀愛','工作','考試','清醒夢','噩夢','搞笑'];
@@ -260,12 +261,15 @@ export default function DreamJournal() {
   };
 
   const loadDreams = async () => {
-    const [dreamsData, reportsData] = await Promise.all([
+    const todayDate = new Date().toISOString().split('T')[0];
+    const [dreamsData, reportsData, noDreamToday] = await Promise.all([
       getDreams(),
-      getWeeklyReports()
+      getWeeklyReports(),
+      hasNoDreamForDate(todayDate)
     ]);
     setDreams(dreamsData);
     setWeeklyReports(reportsData);
+    setHasNoDreamToday(noDreamToday);
   };
 
   // Stats
@@ -313,7 +317,7 @@ export default function DreamJournal() {
       setAnalysisResult(null);
       loadDreams();
     } else {
-      alert('保存失敗');
+      alert(res.error ?? '保存失敗');
     }
   };
 
@@ -753,8 +757,18 @@ export default function DreamJournal() {
                 <button onClick={() => handleSave('dream')} className="flex-1 py-3 rounded-xl bg-gradient-to-br from-[var(--accent2)] to-[var(--accent)] text-white font-bold shadow-lg shadow-purple-900/30 active:scale-95 transition-transform">
                     保存今天的夢 ✨
                 </button>
-                <button onClick={() => handleSave('no_dream')} className="px-6 py-3 rounded-xl border border-[var(--border)] text-[var(--muted)] hover:bg-white/5 active:scale-95 transition-transform">
-                    今天竟沒有發夢 😴
+                <button 
+                    onClick={() => handleSave('no_dream')} 
+                    disabled={hasNoDreamToday}
+                    className={cn(
+                        "px-6 py-3 rounded-xl border transition-transform",
+                        hasNoDreamToday 
+                            ? "border-green-500/30 bg-green-500/10 text-green-400 cursor-not-allowed" 
+                            : "border-[var(--border)] text-[var(--muted)] hover:bg-white/5 active:scale-95"
+                    )}
+                    title={hasNoDreamToday ? "今日已記錄冇發夢" : undefined}
+                >
+                    {hasNoDreamToday ? "已記錄冇發夢 ✓" : "今天冇發夢 😴"}
                 </button>
             </div>
           </motion.section>

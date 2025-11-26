@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getSession, hashPassword } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import type { User } from '@prisma/client';
 import { PLANS, ROLES, type PlanType } from '@/lib/constants';
@@ -140,5 +140,64 @@ export async function getUserDreamCount(userId: string): Promise<number> {
   return await prisma.dream.count({
     where: { userId },
   });
+}
+
+// Reset user password (superadmin only)
+export async function resetUserPassword(
+  userId: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireSuperAdmin();
+    
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, error: '密碼必須至少 6 個字元' };
+    }
+    
+    const hashedPassword = await hashPassword(newPassword);
+    
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+    
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error) {
+    console.error('Reset user password error:', error);
+    return { success: false, error: '重設密碼失敗' };
+  }
+}
+
+// Update user plan with custom expiry date (superadmin only)
+export async function updateUserPlanWithExpiry(
+  userId: string,
+  plan: PlanType,
+  planExpiresAt: Date | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireSuperAdmin();
+    
+    const session = await getSession();
+    
+    // Prevent self-modification of critical fields
+    if (userId === session?.userId) {
+      return { success: false, error: '無法修改自己的計劃' };
+    }
+    
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        plan,
+        planExpiresAt: plan === PLANS.FREE ? null : planExpiresAt,
+      },
+    });
+    
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error) {
+    console.error('Update user plan with expiry error:', error);
+    return { success: false, error: '更新計劃失敗' };
+  }
 }
 

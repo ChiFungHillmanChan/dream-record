@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Crown, Shield, ArrowLeft, Search, 
   Calendar, Mail, User as UserIcon, Sparkles,
-  X, Check
+  X, Check, Key, RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
-import { PLANS, PLAN_PRICING, PLAN_FEATURES, ROLES } from '@/lib/constants';
-import { updateUserPlan, updateUserRole, type UserListItem } from '@/app/actions/admin';
+import { PLANS, PLAN_FEATURES, ROLES } from '@/lib/constants';
+import { updateUserPlanWithExpiry, updateUserRole, resetUserPassword, type UserListItem } from '@/app/actions/admin';
 
 interface AdminPageClientProps {
   users: UserListItem[];
@@ -26,32 +26,79 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [planDuration, setPlanDuration] = useState<'monthly' | 'yearly'>('monthly');
+  const [planDuration, setPlanDuration] = useState<'monthly' | 'yearly' | 'custom'>('monthly');
+  const [customExpiryDate, setCustomExpiryDate] = useState<string>('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showPasswordSuccess, setShowPasswordSuccess] = useState(false);
 
   const filteredUsers = users.filter(user => 
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const openUserModal = (user: UserListItem) => {
+    setSelectedUser(user);
+    setNewPassword('');
+    setShowPasswordSuccess(false);
+    setPlanDuration('monthly');
+    setCustomExpiryDate('');
+  };
+
+  const closeUserModal = () => {
+    setSelectedUser(null);
+    setNewPassword('');
+    setShowPasswordSuccess(false);
+  };
+
   const handleUpdatePlan = async (userId: string, plan: 'FREE' | 'DEEP') => {
     setIsUpdating(true);
-    const durationMonths = plan === PLANS.DEEP ? (planDuration === 'yearly' ? 12 : 1) : undefined;
-    const result = await updateUserPlan(userId, plan, durationMonths);
+    
+    let planExpiresAt: Date | null = null;
+    
+    if (plan === PLANS.DEEP) {
+      if (planDuration === 'custom' && customExpiryDate) {
+        planExpiresAt = new Date(customExpiryDate);
+      } else if (planDuration === 'yearly') {
+        planExpiresAt = new Date();
+        planExpiresAt.setFullYear(planExpiresAt.getFullYear() + 1);
+      } else {
+        planExpiresAt = new Date();
+        planExpiresAt.setMonth(planExpiresAt.getMonth() + 1);
+      }
+    }
+    
+    const result = await updateUserPlanWithExpiry(userId, plan, planExpiresAt);
     
     if (result.success) {
       // Update local state
       setUsers(prev => prev.map(u => {
         if (u.id === userId) {
-          const planExpiresAt = plan === PLANS.DEEP 
-            ? new Date(Date.now() + (durationMonths ?? 1) * 30 * 24 * 60 * 60 * 1000)
-            : null;
           return { ...u, plan, planExpiresAt };
         }
         return u;
       }));
-      setSelectedUser(null);
+      closeUserModal();
     } else {
       alert(result.error ?? '更新計劃失敗');
+    }
+    setIsUpdating(false);
+  };
+
+  const handleResetPassword = async (userId: string) => {
+    if (!newPassword || newPassword.length < 6) {
+      alert('密碼必須至少 6 個字元');
+      return;
+    }
+    
+    setIsUpdating(true);
+    const result = await resetUserPassword(userId, newPassword);
+    
+    if (result.success) {
+      setNewPassword('');
+      setShowPasswordSuccess(true);
+      setTimeout(() => setShowPasswordSuccess(false), 3000);
+    } else {
+      alert(result.error ?? '重設密碼失敗');
     }
     setIsUpdating(false);
   };
@@ -257,7 +304,7 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
                   </td>
                   <td className="py-4 px-4 text-right">
                     <button
-                      onClick={() => setSelectedUser(user)}
+                      onClick={() => openUserModal(user)}
                       className="px-3 py-1.5 text-sm bg-accent/20 hover:bg-accent/30 text-accent border border-accent/30 rounded-lg transition-colors"
                     >
                       編輯
@@ -284,7 +331,7 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setSelectedUser(null)}
+            onClick={closeUserModal}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -296,7 +343,7 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-white">編輯用戶</h3>
                 <button
-                  onClick={() => setSelectedUser(null)}
+                  onClick={closeUserModal}
                   className="p-2 hover:bg-white/10 rounded-full transition-colors"
                 >
                   <X className="w-5 h-5 text-gray-400" />
@@ -348,6 +395,36 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
                   </div>
                 </div>
 
+                {/* Password Reset */}
+                <div>
+                  <label className="text-sm font-medium text-gray-300 mb-2 block">重設密碼</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="輸入新密碼（至少6位）"
+                        className="w-full bg-black/20 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder:text-gray-500 focus:outline-none focus:border-accent/50"
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleResetPassword(selectedUser.id)}
+                      disabled={isUpdating || newPassword.length < 6}
+                      className="px-4 py-2.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/30 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} />
+                      重設
+                    </button>
+                  </div>
+                  {showPasswordSuccess && (
+                    <div className="mt-2 text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg p-2">
+                      ✓ 密碼重設成功
+                    </div>
+                  )}
+                </div>
+
                 {/* Plan Selection */}
                 <div>
                   <label className="text-sm font-medium text-gray-300 mb-2 block">計劃</label>
@@ -356,26 +433,49 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
                   <div className="flex gap-2 mb-3">
                     <button
                       onClick={() => setPlanDuration('monthly')}
-                      className={`flex-1 py-2 px-3 rounded-lg text-sm transition-all ${
+                      className={`flex-1 py-2 px-2 rounded-lg text-xs transition-all ${
                         planDuration === 'monthly'
                           ? 'bg-accent/20 text-accent border border-accent/30'
                           : 'bg-white/5 text-gray-400 border border-white/10'
                       }`}
                     >
-                      月費 HK${PLAN_PRICING.DEEP.monthly}
+                      月費
                     </button>
                     <button
                       onClick={() => setPlanDuration('yearly')}
-                      className={`flex-1 py-2 px-3 rounded-lg text-sm transition-all ${
+                      className={`flex-1 py-2 px-2 rounded-lg text-xs transition-all ${
                         planDuration === 'yearly'
                           ? 'bg-accent/20 text-accent border border-accent/30'
                           : 'bg-white/5 text-gray-400 border border-white/10'
                       }`}
                     >
-                      年費 HK${PLAN_PRICING.DEEP.yearly.toFixed(2)}
-                      <span className="ml-1 text-green-400 text-xs">-{PLAN_PRICING.DEEP.discountPercent}%</span>
+                      年費
+                    </button>
+                    <button
+                      onClick={() => setPlanDuration('custom')}
+                      className={`flex-1 py-2 px-2 rounded-lg text-xs transition-all ${
+                        planDuration === 'custom'
+                          ? 'bg-accent/20 text-accent border border-accent/30'
+                          : 'bg-white/5 text-gray-400 border border-white/10'
+                      }`}
+                    >
+                      自訂日期
                     </button>
                   </div>
+                  
+                  {/* Custom Date Picker */}
+                  {planDuration === 'custom' && (
+                    <div className="mb-3">
+                      <label className="text-xs text-gray-400 mb-1 block">到期日期</label>
+                      <input
+                        type="date"
+                        value={customExpiryDate}
+                        onChange={(e) => setCustomExpiryDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-accent/50"
+                      />
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -397,7 +497,7 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
                     </button>
                     <button
                       onClick={() => handleUpdatePlan(selectedUser.id, PLANS.DEEP)}
-                      disabled={isUpdating}
+                      disabled={isUpdating || (planDuration === 'custom' && !customExpiryDate)}
                       className={`p-4 rounded-xl border transition-all ${
                         selectedUser.plan === PLANS.DEEP
                           ? 'bg-purple-500/30 border-purple-500/50'
@@ -431,7 +531,7 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
 
               <div className="mt-6 flex justify-end">
                 <button
-                  onClick={() => setSelectedUser(null)}
+                  onClick={closeUserModal}
                   className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
                 >
                   完成
