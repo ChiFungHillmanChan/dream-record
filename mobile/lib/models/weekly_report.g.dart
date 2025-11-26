@@ -88,3 +88,4 @@ Map<String, dynamic> _$MetricsToJson(Metrics instance) => <String, dynamic>{
       'emotionVolatility': instance.emotionVolatility,
     };
 
+

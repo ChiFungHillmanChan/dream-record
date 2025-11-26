@@ -118,3 +118,4 @@ class AnalysisSection {
   Map<String, dynamic> toJson() => _$AnalysisSectionToJson(this);
 }
 
+

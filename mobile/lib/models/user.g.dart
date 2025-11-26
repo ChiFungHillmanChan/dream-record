@@ -34,3 +34,4 @@ Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
       'remainingAnalyses': instance.remainingAnalyses,
     };
 
+

@@ -60,3 +60,4 @@ Map<String, dynamic> _$AnalysisSectionToJson(AnalysisSection instance) =>
       'content': instance.content,
     };
 
+

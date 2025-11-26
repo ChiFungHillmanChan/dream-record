@@ -114,3 +114,4 @@ flutter build ios --release
 - Voice recording requires microphone permission
 - Secure storage is used for JWT token persistence
 
+
