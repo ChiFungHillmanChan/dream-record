@@ -1,14 +1,16 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateWeeklyReport, WeeklyReportData, WeeklyReportStatus } from '@/app/actions';
 import { PLANS } from '@/lib/constants';
-import { Loader2, Lock, Sparkles, ArrowLeft, Brain, Heart, Zap, Crown, FileText, ChevronRight, Quote, Fingerprint, Calendar } from 'lucide-react';
+import { Loader2, Lock, Sparkles, ArrowLeft, Brain, Heart, Zap, Crown, FileText, ChevronRight, Quote, Fingerprint, Calendar, Download, ShieldCheck, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { WeeklyReport } from '@prisma/client';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 // Helper for tag colors (reused from main page logic)
 const TAG_PALETTE = [
@@ -284,18 +286,110 @@ export default function WeeklyReportsClient({ initialReports, userPlan, reportSt
   );
 }
 
-// ...
 function cleanMarkdown(text: string) {
   if (!text) return "";
   return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
 }
 
+// --- Radar Chart Component ---
+const RadarChart = ({ metrics }: { metrics: WeeklyReportData['metrics'] }) => {
+  if (!metrics) return null;
+
+  const data = [
+    { label: '睡眠品質', value: metrics.sleepQualityIndex / 2, max: 5 }, // normalize 0-10 to 0-5
+    { label: '情緒穩定', value: metrics.emotionVolatility, max: 5 },
+    { label: '覺知力', value: metrics.lucidDreamCount > 5 ? 5 : metrics.lucidDreamCount, max: 5 },
+    { label: '醒覺張力', value: metrics.awakeningArousalLevel, max: 5 },
+    { label: '符號重複', value: metrics.recurringSymbolScore, max: 5 },
+    { label: '噩夢指數', value: metrics.nightmareRatio / 20, max: 5 }, // normalize 0-100% to 0-5
+  ];
+
+  const size = 200;
+  const center = size / 2;
+  const radius = size / 2 - 40;
+  const angleStep = (Math.PI * 2) / data.length;
+
+  const getCoordinates = (value: number, index: number, max: number) => {
+    const angle = index * angleStep - Math.PI / 2;
+    const r = (value / max) * radius;
+    return {
+      x: center + r * Math.cos(angle),
+      y: center + r * Math.sin(angle),
+    };
+  };
+
+  const points = data.map((d, i) => {
+    const coords = getCoordinates(d.value, i, d.max);
+    return `${coords.x},${coords.y}`;
+  }).join(' ');
+
+  const gridLevels = [1, 2, 3, 4, 5];
+
+  return (
+    <div className="relative w-full max-w-[300px] mx-auto aspect-square">
+      <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full">
+        {/* Grid */}
+        {gridLevels.map((level) => (
+          <polygon
+            key={level}
+            points={data.map((_, i) => {
+              const coords = getCoordinates(level, i, 5);
+              return `${coords.x},${coords.y}`;
+            }).join(' ')}
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.1)"
+            strokeWidth="1"
+          />
+        ))}
+        
+        {/* Axis Lines */}
+        {data.map((_, i) => {
+            const end = getCoordinates(5, i, 5);
+            return (
+                <line key={i} x1={center} y1={center} x2={end.x} y2={end.y} stroke="rgba(255, 255, 255, 0.1)" />
+            )
+        })}
+
+        {/* Data Polygon */}
+        <polygon
+          points={points}
+          fill="rgba(168, 85, 247, 0.2)"
+          stroke="rgba(168, 85, 247, 0.8)"
+          strokeWidth="2"
+        />
+        
+        {/* Labels */}
+        {data.map((d, i) => {
+          const coords = getCoordinates(6, i, 5); // Push label out a bit
+          return (
+            <text
+              key={i}
+              x={coords.x}
+              y={coords.y}
+              textAnchor="middle"
+              dy="0.3em"
+              fill="rgba(255,255,255,0.7)"
+              fontSize="10"
+              className="uppercase tracking-wide"
+            >
+              {d.label}
+            </text>
+          );
+        })}
+      </svg>
+    </div>
+  );
+};
+
 function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: boolean, onBack: () => void }) {
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const data = JSON.parse(report.analysis) as WeeklyReportData;
   const startDate = new Date(report.startDate).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric' });
   const endDate = new Date(report.endDate).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric' });
 
-  // Clean up potentially legacy markdown
+  // Clean up potential legacy/markdown data structure issues
   const safeData = {
     ...data,
     word_of_the_week: cleanMarkdown(data.word_of_the_week),
@@ -305,21 +399,76 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
     deep_insight: cleanMarkdown(data.deep_insight),
     advice: cleanMarkdown(data.advice),
     reflection_question: cleanMarkdown(data.reflection_question),
-    themes: data.themes.map(t => ({
+    themes: data.themes ? data.themes.map(t => ({
         ...t,
         name: cleanMarkdown(t.name),
         description: cleanMarkdown(t.description)
-    })),
-    archetypes: data.archetypes.map(a => ({
+    })) : [],
+    archetypes: data.archetypes ? data.archetypes.map(a => ({
         ...a,
         name: cleanMarkdown(a.name),
         explanation: cleanMarkdown(a.explanation)
-    }))
+    })) : [],
+    psychological_analysis: data.psychological_analysis || {
+        perspective_1: { name: "分析視角 1", content: "資料格式更新中..." },
+        perspective_2: { name: "分析視角 2", content: "資料格式更新中..." }
+    },
+    metrics: data.metrics || {
+        sleepQualityIndex: 0,
+        nightmareRatio: 0,
+        recurringSymbolScore: 0,
+        awakeningArousalLevel: 0,
+        lucidDreamCount: 0,
+        emotionVolatility: 0
+    },
+    interventions: data.interventions || [],
+    disclaimer: data.disclaimer || "本報告提供心理象徵與模式識別洞察，不等同醫療診斷。",
+    quality_check_status: data.quality_check_status || "品質檢核通過"
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!reportRef.current) return;
+    setIsDownloading(true);
+
+    try {
+        const canvas = await html2canvas(reportRef.current, {
+            scale: 2, // High resolution
+            backgroundColor: '#0f1230', // Match background color
+            useCORS: true // For images
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        const imgWidth = 210; // A4 width in mm
+        const pageHeight = 297; // A4 height in mm
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+
+        while (heightLeft >= 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+        }
+
+        pdf.save(`Weekly_Dream_Report_${data.word_of_the_week}.pdf`);
+    } catch (err) {
+        console.error("PDF Generation failed:", err);
+    } finally {
+        setIsDownloading(false);
+    }
   };
 
   return (
-// ... use safeData instead of data
-
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -327,7 +476,7 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="relative"
     >
-       {/* Navigation */}
+       {/* Navigation & Actions */}
        <div className="sticky top-4 z-50 mb-6 flex justify-between items-center">
           <button 
             onClick={onBack}
@@ -335,35 +484,52 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
           >
             <ArrowLeft className="w-4 h-4" /> 返回列表
           </button>
-          <div className="text-[10px] font-mono text-slate-500 bg-black/50 backdrop-blur px-3 py-1 rounded-full border border-white/5">
-            ID: {report.id.slice(0, 8).toUpperCase()}
+          
+          <div className="flex items-center gap-3">
+            <div className="text-[10px] font-mono text-slate-500 bg-black/50 backdrop-blur px-3 py-2 rounded-full border border-white/5 hidden md:block">
+                ID: {report.id.slice(0, 8).toUpperCase()}
+            </div>
+            <button 
+                onClick={handleDownloadPDF}
+                disabled={isDownloading}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-500 text-white transition-all text-sm font-bold shadow-lg shadow-purple-900/20 disabled:opacity-50"
+            >
+                {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {isDownloading ? '生成中...' : '下載 PDF'}
+            </button>
           </div>
        </div>
 
-       <div className="bg-[#0f1230] shadow-2xl shadow-black/50 rounded-[2rem] overflow-hidden border border-white/10 max-w-5xl mx-auto relative">
+       {/* Report Container - Ref for PDF */}
+       <div ref={reportRef} className="bg-[#0f1230] shadow-2xl shadow-black/50 rounded-[2rem] overflow-hidden border border-white/10 max-w-5xl mx-auto relative">
          {/* Ambient Glow */}
          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-96 bg-purple-900/20 blur-[120px] pointer-events-none" />
 
          {/* Header Section */}
          <div className="relative p-8 md:p-12 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[10px] font-bold tracking-widest uppercase mb-6">
-              <Sparkles className="w-3 h-3" /> 每週分析
+              <Sparkles className="w-3 h-3" /> 專業深度夢境週報
             </div>
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 tracking-tight">
-              {data.word_of_the_week}
+              {safeData.word_of_the_week}
             </h1>
-            <p className="text-slate-400 font-medium">
+            <p className="text-slate-400 font-medium mb-6">
               {startDate} — {endDate}
             </p>
+            
+            {/* Quality Check Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-900/20 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+                <ShieldCheck className="w-3 h-3" /> {safeData.quality_check_status}
+            </div>
          </div>
 
          {/* Split Content */}
          <div className="flex flex-col md:flex-row border-t border-white/5">
-            {/* Left Sidebar */}
+            {/* Left Sidebar - Visuals & Metrics */}
             <div className="md:w-[35%] border-r border-white/5 bg-black/20 p-8 md:p-10 space-y-10">
                {/* Visualization */}
                <div className="space-y-4">
-                 <h3 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">夢境映像</h3>
+                 <h3 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">潛意識映射</h3>
                  <div className="aspect-square w-full rounded-2xl overflow-hidden border border-white/10 relative group bg-black/40 shadow-inner">
                     {report.imageBase64 ? (
                       <>
@@ -381,9 +547,24 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
                       </div>
                     )}
                  </div>
-                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                    AI 根據本週夢境關鍵詞生成的潛意識映射圖。
-                 </p>
+               </div>
+
+               {/* Metrics Radar */}
+               <div className="space-y-4">
+                 <h3 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase flex items-center gap-2">
+                   <Fingerprint className="w-3 h-3" /> 心理指標雷達
+                 </h3>
+                 <RadarChart metrics={safeData.metrics} />
+                 <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 mt-4">
+                    <div className="bg-white/5 p-2 rounded border border-white/5 text-center">
+                        <span className="block text-purple-300 font-bold">{safeData.metrics.sleepQualityIndex}/10</span>
+                        睡眠品質
+                    </div>
+                    <div className="bg-white/5 p-2 rounded border border-white/5 text-center">
+                        <span className="block text-red-300 font-bold">{safeData.metrics.nightmareRatio}%</span>
+                        噩夢佔比
+                    </div>
+                 </div>
                </div>
 
                {/* Emotional Arc */}
@@ -393,19 +574,7 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
                  </h3>
                  <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
                    <p className="text-sm text-slate-300 leading-relaxed italic">
-                     &quot;{data.emotional_trajectory}&quot;
-                   </p>
-                 </div>
-               </div>
-
-               {/* Day Residue */}
-               <div className="space-y-3">
-                 <h3 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase flex items-center gap-2">
-                   <Zap className="w-3 h-3" /> 日間殘留
-                 </h3>
-                 <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
-                   <p className="text-xs text-slate-400 leading-relaxed">
-                     {data.day_residue_analysis}
+                     &quot;{safeData.emotional_trajectory}&quot;
                    </p>
                  </div>
                </div>
@@ -417,37 +586,62 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
                <section>
                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                    <FileText className="w-5 h-5 text-purple-400" />
-                   總結摘要
+                   本週分析摘要
                  </h3>
                  <p className="text-slate-300 text-lg leading-relaxed">
-                   {data.summary}
+                   {safeData.summary}
                  </p>
                </section>
 
-               {/* Deep Insight */}
-               <section className="bg-gradient-to-br from-purple-900/20 to-indigo-900/20 p-6 rounded-2xl border border-purple-500/20 relative overflow-hidden">
-                 <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-2xl rounded-full pointer-events-none" />
-                 <h3 className="text-xs font-bold text-purple-300 uppercase tracking-wide mb-3 flex items-center gap-2 relative z-10">
-                   <Fingerprint className="w-4 h-4" /> 深度心理洞察
+               {/* Psychological Analysis (Dual Perspective) */}
+               <section className="space-y-6">
+                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                   <Brain className="w-5 h-5 text-blue-400" />
+                   雙視角心理分析
                  </h3>
-                 <p className="text-purple-100 text-base font-medium leading-relaxed relative z-10">
-                   {data.deep_insight || "此版本無法顯示深度分析。"}
-                 </p>
+                 
+                 <div className={`grid md:grid-cols-2 gap-6 ${isFree ? 'blur-sm select-none opacity-50' : ''}`}>
+                    {/* Perspective 1 */}
+                    <div className="bg-[#1e1b4b]/40 p-6 rounded-2xl border border-indigo-500/20">
+                        <h4 className="text-indigo-300 font-bold mb-3 text-sm uppercase tracking-wide">
+                            {safeData.psychological_analysis.perspective_1.name}
+                        </h4>
+                        <p className="text-slate-300 text-sm leading-relaxed">
+                            {safeData.psychological_analysis.perspective_1.content}
+                        </p>
+                    </div>
+                    {/* Perspective 2 */}
+                    <div className="bg-[#3f2c33]/40 p-6 rounded-2xl border border-rose-500/20">
+                        <h4 className="text-rose-300 font-bold mb-3 text-sm uppercase tracking-wide">
+                            {safeData.psychological_analysis.perspective_2.name}
+                        </h4>
+                        <p className="text-slate-300 text-sm leading-relaxed">
+                            {safeData.psychological_analysis.perspective_2.content}
+                        </p>
+                    </div>
+                 </div>
+                 {isFree && <PremiumLockOverlay />}
                </section>
 
                {/* Themes */}
                <section>
                  <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                   <Brain className="w-5 h-5 text-blue-400" />
-                   反覆出現的主題
+                   <Zap className="w-5 h-5 text-amber-400" />
+                   核心主題與權重
                  </h3>
                  <div className="space-y-4">
-                   {data.themes.map((theme, i) => (
-                     <div key={i} className={`relative pl-6 border-l-2 border-white/10 hover:border-purple-500/50 transition-colors pb-1 ${isFree ? 'blur-sm select-none opacity-50' : ''}`}>
-                       <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-[#0f1230] border-2 border-white/20" />
-                       <h4 className="text-base font-bold text-slate-200 mb-1">
-                         {theme.name}
-                       </h4>
+                   {safeData.themes.map((theme, i) => (
+                     <div key={i} className={`relative p-4 bg-white/5 rounded-xl border border-white/5 ${isFree ? 'blur-sm select-none opacity-50' : ''}`}>
+                       <div className="flex justify-between items-start mb-2">
+                           <h4 className="text-base font-bold text-slate-200">
+                             {theme.name}
+                           </h4>
+                           <div className="flex gap-1">
+                               {[...Array(5)].map((_, idx) => (
+                                   <div key={idx} className={`w-1.5 h-3 rounded-sm ${idx < (theme.score || 3) ? 'bg-purple-500' : 'bg-white/10'}`} />
+                               ))}
+                           </div>
+                       </div>
                        <p className="text-sm text-slate-400 leading-relaxed">
                          {theme.description}
                        </p>
@@ -457,39 +651,49 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
                  {isFree && <PremiumLockOverlay />}
                </section>
 
-               {/* Archetypes */}
-               <section className="relative">
+               {/* Interventions / Action Plan */}
+               <section>
                  <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                   <Crown className="w-5 h-5 text-amber-400" />
-                   原型模式
+                   <Crown className="w-5 h-5 text-emerald-400" />
+                   專業干預建議
                  </h3>
-                 <div className="grid md:grid-cols-2 gap-4">
-                   {data.archetypes.map((arch, i) => (
-                     <div key={i} className={`bg-amber-900/10 p-4 rounded-xl border border-amber-500/20 ${isFree ? 'blur-sm select-none opacity-50' : ''}`}>
-                       <h4 className="text-sm font-bold text-amber-200 mb-2">{arch.name}</h4>
-                       <p className="text-xs text-amber-100/60 leading-relaxed">{arch.explanation}</p>
-                     </div>
-                   ))}
+                 <div className={`grid gap-4 ${isFree ? 'blur-sm select-none opacity-50' : ''}`}>
+                    {safeData.interventions.map((item, idx) => (
+                        <div key={idx} className="flex gap-4 bg-emerald-900/10 p-5 rounded-xl border border-emerald-500/20">
+                             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
+                                {idx + 1}
+                             </div>
+                             <div>
+                                 <div className="flex items-baseline gap-2 mb-1">
+                                    <h4 className="font-bold text-emerald-100">{item.title}</h4>
+                                    <span className="text-[10px] text-emerald-500 uppercase border border-emerald-500/30 px-1.5 rounded">{item.technique}</span>
+                                 </div>
+                                 <p className="text-sm text-emerald-200/80 mb-2">{item.steps}</p>
+                                 <div className="text-xs text-emerald-500 font-mono">
+                                     建議時長：{item.duration}
+                                 </div>
+                             </div>
+                        </div>
+                    ))}
                  </div>
                  {isFree && <PremiumLockOverlay />}
                </section>
 
-               {/* Advice */}
+               {/* Advice & Reflection */}
                <section className="relative">
                   <div className={`bg-gradient-to-br from-slate-800 to-black p-8 rounded-2xl border border-white/10 ${isFree ? 'blur-sm select-none opacity-50' : ''}`}>
                     <Quote className="w-8 h-8 text-white/10 mb-4" />
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">整合建議</h3>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">生活建議 & 反思</h3>
                     
                     <div className="space-y-8">
                       <div>
-                        <h4 className="text-base font-bold text-white mb-2">行動指引</h4>
-                        <p className="text-slate-300 leading-relaxed">{data.advice}</p>
+                        <p className="text-slate-300 leading-relaxed">{safeData.advice}</p>
                       </div>
                       
                       <div className="pt-6 border-t border-white/10">
-                        <h4 className="text-xs font-bold text-blue-400 mb-3">反思問題</h4>
+                        <h4 className="text-xs font-bold text-blue-400 mb-3">本週禪機一問</h4>
                         <p className="text-lg text-white italic font-serif opacity-90">
-                          &quot;{data.reflection_question}&quot;
+                          &quot;{safeData.reflection_question}&quot;
                         </p>
                       </div>
                     </div>
@@ -497,6 +701,16 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
                   {isFree && <PremiumLockOverlay dark />}
                </section>
             </div>
+         </div>
+
+         {/* Footer / Disclaimer */}
+         <div className="bg-black/40 p-6 text-center border-t border-white/5">
+            <div className="flex items-center justify-center gap-2 text-amber-500/80 text-xs mb-2">
+                <AlertTriangle className="w-3 h-3" /> 免責聲明
+            </div>
+            <p className="text-[10px] text-slate-500 max-w-2xl mx-auto leading-relaxed">
+                {safeData.disclaimer}
+            </p>
          </div>
        </div>
     </motion.div>
@@ -512,7 +726,7 @@ function PremiumLockOverlay({ dark = false }: { dark?: boolean }) {
          </div>
          <h4 className="text-sm font-bold text-white mb-1">深度版限定內容</h4>
          <p className="text-xs text-slate-400 mb-4">
-           解鎖原型分析、隱藏主題與具體行動建議。
+           解鎖雙視角心理分析、專業干預建議與詳細指標。
          </p>
          <Link href="/settings" className="block w-full py-2 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white text-xs font-bold rounded-lg transition-all shadow-lg shadow-amber-900/20">
            升級解鎖

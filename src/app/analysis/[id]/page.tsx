@@ -3,12 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useRouter } from 'next/navigation';
-import { X, Copy, Share2, CheckCircle, Sparkles, ArrowLeft, Loader2, Download } from 'lucide-react';
+import { X, Copy, CheckCircle, Sparkles, ArrowLeft, Loader2, Download } from 'lucide-react';
 import Link from 'next/link';
 import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { getDreamById, DreamWithAnalysis, getCurrentUser, CurrentUserInfo, DreamAnalysisResult } from '@/app/actions';
 import { PLANS, ROLES } from '@/lib/constants';
 import { DreamResult } from '@/components/DreamResult';
+import { DreamLoading } from '@/components/DreamLoading';
 
 export default function AnalysisPage() {
   const params = useParams();
@@ -17,8 +19,7 @@ export default function AnalysisPage() {
   const [user, setUser] = useState<CurrentUserInfo>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [shareSuccess, setShareSuccess] = useState(false);
-  const [isCapturing, setIsCapturing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   // Ref for the content to capture as screenshot
   const captureRef = useRef<HTMLDivElement>(null);
@@ -91,113 +92,64 @@ export default function AnalysisPage() {
     }
   };
 
-  const handleShare = async () => {
+  const handleDownloadPDF = async () => {
     if (!captureRef.current || !dream?.analysis) return;
     
-    setIsCapturing(true);
+    setIsDownloading(true);
     
     try {
       // Wait a bit for the UI to settle
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Capture the content as an image with Safari-friendly settings
+      // Capture the content as an image
       const canvas = await html2canvas(captureRef.current, {
         backgroundColor: '#0a0a0f',
-        scale: window.devicePixelRatio > 1 ? 2 : 1, // Adaptive scale for mobile
+        scale: 2, // High resolution
         useCORS: true,
         logging: false,
         allowTaint: true,
-        // Safari-specific fixes
-        foreignObjectRendering: false, // Disable for better Safari compatibility
+        foreignObjectRendering: false, // Better cross-browser compatibility
         removeContainer: true,
       });
       
-      // Convert to blob with JPEG fallback for Safari (smaller file, better compatibility)
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const mimeType = isIOS ? 'image/jpeg' : 'image/png';
-      const quality = isIOS ? 0.9 : 1.0;
-      const extension = isIOS ? 'jpg' : 'png';
+      const imgData = canvas.toDataURL('image/png');
       
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => {
-          if (b) resolve(b);
-          else reject(new Error('Failed to create blob'));
-        }, mimeType, quality);
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
       });
-      
-      const fileName = `dream-analysis-${new Date().toISOString().split('T')[0]}.${extension}`;
-      
-      // Try Web Share API first (for mobile)
-      if (navigator.share) {
-        try {
-          // Create file for sharing
-          const file = new File([blob], fileName, { type: mimeType });
-          
-          // Check if file sharing is supported
-          const canShareFiles = navigator.canShare?.({ files: [file] }) ?? false;
-          
-          if (canShareFiles) {
-            await navigator.share({
-              title: '我的夢境解析',
-              text: '來看看我的夢境解析報告！',
-              files: [file]
-            });
-            setShareSuccess(true);
-            setTimeout(() => setShareSuccess(false), 2000);
-            return;
-          }
-          
-          // Fallback: share without file (text only) - works on Safari
-          await navigator.share({
-            title: '我的夢境解析',
-            text: '來看看我的夢境解析報告！\n\n由 Dream Record 生成',
-            url: window.location.href
-          });
-          
-          // Also trigger download so user has the image
-          downloadImage(blob, fileName);
-          setShareSuccess(true);
-          setTimeout(() => setShareSuccess(false), 2000);
-          return;
-        } catch (shareError) {
-          // If share was cancelled, don't show error
-          if ((shareError as Error).name === 'AbortError') {
-            return;
-          }
-          // Fall through to download fallback
-        }
+
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
       }
+
+      // Generate filename with date
+      const dateStr = new Date(dream.createdAt).toISOString().split('T')[0];
+      const fileName = `Dream_Analysis_${dateStr}.pdf`;
       
-      // Final fallback: just download the image
-      downloadImage(blob, fileName);
-      setShareSuccess(true);
-      setTimeout(() => setShareSuccess(false), 2000);
+      // Save the PDF
+      pdf.save(fileName);
 
     } catch (err) {
-      console.error('Share failed:', err);
-      // Show user-friendly message
-      alert('分享失敗，請嘗試長按圖片保存後分享');
+      console.error('PDF Download failed:', err);
+      alert('下載失敗，請稍後再試');
     } finally {
-      setIsCapturing(false);
+      setIsDownloading(false);
     }
-  };
-  
-  // Helper function to download image
-  const downloadImage = (blob: Blob, fileName: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    // For iOS Safari, we need to open in new tab instead of download
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-    }
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    // Delay URL revocation for iOS Safari
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const handleClose = () => {
@@ -206,23 +158,13 @@ export default function AnalysisPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <div className="w-16 h-16 mx-auto mb-4 relative">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--accent)] border-r-[var(--accent2)]"
-            />
-            <Sparkles className="w-8 h-8 text-[var(--accent)] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-          </div>
-          <p className="text-[var(--muted)]">正在為您生成報告...</p>
-        </motion.div>
-      </div>
+      <DreamLoading 
+        messages={[
+          "正在準備分析報告...",
+          "讀取夢境解析...",
+          "呈現潛意識洞察..."
+        ]} 
+      />
     );
   }
 
@@ -270,9 +212,9 @@ export default function AnalysisPage() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-[#0a0a0f]">
-      {/* Capture Overlay Loading */}
+      {/* Download Overlay Loading */}
       <AnimatePresence>
-        {isCapturing && (
+        {isDownloading && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -287,7 +229,7 @@ export default function AnalysisPage() {
               />
               <Download className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[var(--accent)]" />
             </div>
-            <p className="text-lg font-medium">正在擷取報告畫面...</p>
+            <p className="text-lg font-medium">正在生成 PDF...</p>
             <p className="text-sm text-white/50 mt-2">請稍候</p>
           </motion.div>
         )}
@@ -351,12 +293,12 @@ export default function AnalysisPage() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={handleShare}
-            disabled={isCapturing}
-            className="p-3 rounded-xl bg-[var(--surface)]/80 backdrop-blur-xl border border-[var(--border)] hover:bg-white/10 transition-colors disabled:opacity-50"
-            title="分享截圖"
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
+            className="p-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition-colors disabled:opacity-50 shadow-lg shadow-purple-900/30"
+            title="下載 PDF 報告"
           >
-            <Share2 size={20} />
+            {isDownloading ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -429,7 +371,7 @@ export default function AnalysisPage() {
                             <Sparkles size={14} /> 原始夢境
                         </h3>
                         <div className="text-white/80 whitespace-pre-wrap leading-relaxed text-sm md:text-base font-light italic">
-                            "{dream.content}"
+                            &quot;{dream.content}&quot;
                         </div>
                         <div className="mt-6 flex flex-wrap gap-2">
                             {(() => {

@@ -347,14 +347,44 @@ export async function analyzeDream(content: string): Promise<{ result: DreamAnal
 export type WeeklyReportData = {
   word_of_the_week: string;
   summary: string;
-  themes: { name: string; description: string }[];
+  themes: {
+    name: string;
+    description: string;
+    score: number;
+  }[];
+  metrics: {
+    sleepQualityIndex: number;
+    nightmareRatio: number;
+    recurringSymbolScore: number;
+    awakeningArousalLevel: number;
+    lucidDreamCount: number;
+    emotionVolatility: number;
+  };
+  psychological_analysis: {
+    perspective_1: {
+      name: string;
+      content: string;
+    };
+    perspective_2: {
+      name: string;
+      content: string;
+    };
+  };
   emotional_trajectory: string;
   day_residue_analysis: string;
-  archetypes: { name: string; explanation: string }[];
+  archetypes: { name: string; explanation: string }[]; // Keep for backward compatibility or remove if replaced
   deep_insight: string;
-  advice: string;
+  interventions: {
+    title: string;
+    technique: string;
+    steps: string;
+    duration: string;
+  }[];
+  advice: string; // Keep for backward compatibility
   reflection_question: string;
   image_prompt: string;
+  disclaimer: string;
+  quality_check_status: string;
 };
 
 // Helper function to get current week boundaries (Sunday to Saturday)
@@ -503,9 +533,62 @@ export async function generateWeeklyReport(): Promise<{ success: boolean; error?
                     type: 'object',
                     properties: {
                         name: { type: 'string' },
-                        description: { type: 'string' }
+                        description: { type: 'string' },
+                        score: { type: 'number' }
                     },
-                    required: ['name', 'description'],
+                    required: ['name', 'description', 'score'],
+                    additionalProperties: false
+                }
+              },
+              metrics: {
+                type: 'object',
+                properties: {
+                    sleepQualityIndex: { type: 'number' },
+                    nightmareRatio: { type: 'number' },
+                    recurringSymbolScore: { type: 'number' },
+                    awakeningArousalLevel: { type: 'number' },
+                    lucidDreamCount: { type: 'number' },
+                    emotionVolatility: { type: 'number' }
+                },
+                required: ['sleepQualityIndex', 'nightmareRatio', 'recurringSymbolScore', 'awakeningArousalLevel', 'lucidDreamCount', 'emotionVolatility'],
+                additionalProperties: false
+              },
+              psychological_analysis: {
+                type: 'object',
+                properties: {
+                    perspective_1: {
+                        type: 'object',
+                        properties: {
+                            name: { type: 'string' },
+                            content: { type: 'string' }
+                        },
+                        required: ['name', 'content'],
+                        additionalProperties: false
+                    },
+                    perspective_2: {
+                        type: 'object',
+                        properties: {
+                            name: { type: 'string' },
+                            content: { type: 'string' }
+                        },
+                        required: ['name', 'content'],
+                        additionalProperties: false
+                    }
+                },
+                required: ['perspective_1', 'perspective_2'],
+                additionalProperties: false
+              },
+              interventions: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        title: { type: 'string' },
+                        technique: { type: 'string' },
+                        steps: { type: 'string' },
+                        duration: { type: 'string' }
+                    },
+                    required: ['title', 'technique', 'steps', 'duration'],
                     additionalProperties: false
                 }
               },
@@ -526,12 +609,14 @@ export async function generateWeeklyReport(): Promise<{ success: boolean; error?
               deep_insight: { type: 'string' },
               advice: { type: 'string' },
               reflection_question: { type: 'string' },
-              image_prompt: { type: 'string' }
+              image_prompt: { type: 'string' },
+              disclaimer: { type: 'string' },
+              quality_check_status: { type: 'string' }
             },
             required: [
-              'word_of_the_week', 'summary', 'themes', 'emotional_trajectory', 
-              'day_residue_analysis', 'archetypes', 'deep_insight', 'advice', 
-              'reflection_question', 'image_prompt'
+              'word_of_the_week', 'summary', 'themes', 'metrics', 'psychological_analysis',
+              'emotional_trajectory', 'day_residue_analysis', 'archetypes', 'deep_insight',
+              'interventions', 'advice', 'reflection_question', 'image_prompt', 'disclaimer', 'quality_check_status'
             ],
             additionalProperties: false
           },

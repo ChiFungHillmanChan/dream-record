@@ -236,10 +236,8 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
             <thead>
               <tr className="border-b border-white/10">
                 <th className="text-left py-3 px-4 text-xs font-medium text-gray-400">用戶</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400">角色</th>
                 <th className="text-left py-3 px-4 text-xs font-medium text-gray-400">計劃</th>
                 <th className="text-left py-3 px-4 text-xs font-medium text-gray-400">到期日</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400">註冊日期</th>
                 <th className="text-right py-3 px-4 text-xs font-medium text-gray-400">操作</th>
               </tr>
             </thead>
@@ -267,19 +265,6 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
                     </div>
                   </td>
                   <td className="py-4 px-4">
-                    {user.role === ROLES.SUPERADMIN ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                        <Shield className="w-3 h-3" />
-                        管理員
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30">
-                        <UserIcon className="w-3 h-3" />
-                        一般用戶
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-4 px-4">
                     {user.plan === PLANS.DEEP ? (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30">
                         <Crown className="w-3 h-3" />
@@ -295,11 +280,6 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
                     <span className="text-sm text-gray-400 flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
                       {formatDate(user.planExpiresAt)}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="text-sm text-gray-400">
-                      {formatDate(user.createdAt)}
                     </span>
                   </td>
                   <td className="py-4 px-4 text-right">

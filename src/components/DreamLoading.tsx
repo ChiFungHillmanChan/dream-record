@@ -4,16 +4,17 @@ import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Moon } from 'lucide-react';
 
-export function DreamLoading() {
-  const [messageIndex, setMessageIndex] = useState(0);
-  
-  const messages = [
+export function DreamLoading({ messages: customMessages }: { messages?: string[] }) {
+  const defaultMessages = [
     "正在連結靈魂深處...",
     "解讀天機符號...",
     "感應情緒脈絡...",
     "聆聽潛意識的低語...",
     "揭示命運的啟示..."
   ];
+
+  const messages = customMessages || defaultMessages;
+  const [messageIndex, setMessageIndex] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
