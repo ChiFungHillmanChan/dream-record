@@ -33,6 +33,11 @@ interface SpeechRecognitionEvent {
     };
 }
 
+interface SpeechRecognitionErrorEvent {
+    error: string;
+    message?: string;
+}
+
 interface SpeechRecognition extends EventTarget {
     lang: string;
     continuous: boolean;
@@ -40,6 +45,7 @@ interface SpeechRecognition extends EventTarget {
     start(): void;
     stop(): void;
     onresult: (event: SpeechRecognitionEvent) => void;
+    onerror: (event: SpeechRecognitionErrorEvent) => void;
     onend: () => void;
 }
 
@@ -173,7 +179,7 @@ export default function DreamJournal() {
                 // For now, we rely on final results for the main text, but we could add a UI indicator for interim.
             };
 
-            recognition.onerror = (event: any) => {
+            recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
                 console.error('Speech recognition error', event.error);
                 if (event.error === 'not-allowed') {
                     alert('請允許麥克風權限以使用語音輸入');
