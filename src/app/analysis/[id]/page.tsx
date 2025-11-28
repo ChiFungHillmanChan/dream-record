@@ -101,18 +101,31 @@ export default function AnalysisPage() {
       // Wait a bit for the UI to settle
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Capture the content as an image
+      // Detect device capabilities
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      const isMobile = isIOS || isAndroid || window.innerWidth < 768;
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+        || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+      // Generate filename with date
+      const dateStr = new Date(dream.createdAt).toISOString().split('T')[0];
+      const fileName = `Dream_Analysis_${dateStr}.pdf`;
+
+      // Capture the content as an image with mobile-optimized settings
       const canvas = await html2canvas(captureRef.current, {
         backgroundColor: '#0a0a0f',
-        scale: 2, // High resolution
+        scale: isMobile ? 1.5 : 2, // Lower resolution for mobile to prevent memory issues
         useCORS: true,
         logging: false,
         allowTaint: true,
-        foreignObjectRendering: false, // Better cross-browser compatibility
+        foreignObjectRendering: false,
         removeContainer: true,
+        windowWidth: captureRef.current.scrollWidth,
+        windowHeight: captureRef.current.scrollHeight,
       });
       
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/png', isMobile ? 0.8 : 1.0);
       
       // Create PDF
       const pdf = new jsPDF({
@@ -136,63 +149,83 @@ export default function AnalysisPage() {
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
-
-      // Generate filename with date
-      const dateStr = new Date(dream.createdAt).toISOString().split('T')[0];
-      const fileName = `Dream_Analysis_${dateStr}.pdf`;
       
-      // Get PDF as blob for better mobile compatibility
+      // Get PDF as blob
       const pdfBlob = pdf.output('blob');
-      
-      // Check if running in iOS Safari or PWA standalone mode
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
-        || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-      
-      // Try Web Share API first (best for mobile)
-      if (navigator.share && (isIOS || isStandalone)) {
-        try {
-          const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-          await navigator.share({
-            files: [file],
-            title: '夢境解析報告',
-            text: '我的夢境解析報告'
-          });
-          return;
-        } catch (shareErr) {
-          // Share was cancelled or failed, fall back to other methods
-          console.log('Share cancelled or not supported, trying alternative...');
+
+      // Mobile-specific download handling
+      if (isMobile || isStandalone) {
+        // First, try Web Share API with file sharing (best UX on mobile)
+        if (navigator.canShare && navigator.share) {
+          try {
+            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: '夢境解析報告',
+                text: '我的夢境解析報告'
+              });
+              return;
+            }
+          } catch (shareErr) {
+            // Share was cancelled or not supported, continue to fallback
+            console.log('Share API not available or cancelled, trying fallback...');
+          }
         }
-      }
-      
-      // Create blob URL
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      
-      // For iOS Safari and PWA - open in new tab (allows user to save/share)
-      if (isIOS || isStandalone) {
-        // Open PDF in new tab - user can then use iOS share sheet
-        const newWindow = window.open(blobUrl, '_blank');
-        if (!newWindow) {
-          // If popup blocked, create download link
+
+        // Fallback: Create object URL and use download link with proper handling
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        
+        // For iOS, try opening in new window first
+        if (isIOS) {
+          // Create a hidden iframe to trigger download on iOS
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          document.body.appendChild(iframe);
+          
+          // Try direct link click
           const link = document.createElement('a');
           link.href = blobUrl;
           link.download = fileName;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          
+          // Trigger click
+          link.click();
+          
+          // Cleanup after delay
+          setTimeout(() => {
+            document.body.removeChild(link);
+            document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+          }, 5000);
+        } else {
+          // Android and other mobile browsers
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = fileName;
+          link.target = '_self';
           document.body.appendChild(link);
           link.click();
-          document.body.removeChild(link);
+          
+          setTimeout(() => {
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+          }, 5000);
         }
-        // Clean up blob URL after a delay
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
       } else {
-        // Standard download for desktop browsers
+        // Desktop browsers - standard download
         pdf.save(fileName);
       }
 
     } catch (err) {
       console.error('PDF Download failed:', err);
-      alert('下載失敗，請稍後再試');
+      // Provide more helpful error message
+      if (err instanceof Error && err.message.includes('memory')) {
+        alert('下載失敗：記憶體不足，請嘗試關閉其他應用程式後再試');
+      } else {
+        alert('下載失敗，請稍後再試。如持續失敗，請嘗試使用電腦版下載。');
+      }
     } finally {
       setIsDownloading(false);
     }
