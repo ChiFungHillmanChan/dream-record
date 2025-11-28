@@ -86,10 +86,12 @@ export function DreamResult({ result }: DreamResultProps) {
           </div>
 
           {/* Vibe Tag */}
-          <div className="inline-flex items-center gap-3 bg-black/20 rounded-full px-4 py-2 border border-white/10">
-             <Wind size={16} className="text-indigo-300" />
-             <span className="text-indigo-200 text-sm">整體氛圍：</span>
-             <span className="text-white font-bold">{result.vibe}</span>
+          <div className="inline-flex items-start sm:items-center gap-2 sm:gap-3 bg-black/20 rounded-xl sm:rounded-full px-4 py-3 sm:py-2 border border-white/10">
+             <Wind size={16} className="text-indigo-300 flex-shrink-0 mt-0.5 sm:mt-0" />
+             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+               <span className="text-indigo-200 text-xs sm:text-sm whitespace-nowrap">整體氛圍：</span>
+               <span className="text-white font-bold text-sm sm:text-base">{result.vibe}</span>
+             </div>
           </div>
         </div>
       </motion.div>

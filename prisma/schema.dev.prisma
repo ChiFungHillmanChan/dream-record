@@ -16,6 +16,8 @@ model User {
   role          String    @default("USER") // USER or SUPERADMIN
   plan          String    @default("FREE") // FREE or DEEP
   planExpiresAt DateTime? // When the paid plan expires (null for FREE plan)
+  upgradedByAdmin Boolean @default(false) // True if admin gave trial upgrade
+  hasSeenUpgradePopup Boolean @default(false) // True if user has seen the upgrade celebration popup
   lifetimeAnalysisCount Int @default(0) // Total lifetime analyses for free users (limit: 20)
   lifetimeWeeklyReportCount Int @default(0) // Total lifetime weekly reports for free users (limit: 3)
   createdAt     DateTime  @default(now())

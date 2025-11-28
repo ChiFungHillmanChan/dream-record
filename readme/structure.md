@@ -35,7 +35,8 @@ dream-record/
 │   │   └── [pages]/              # Page routes
 │   ├── components/               # Shared React components
 │   │   ├── DreamLoading.tsx
-│   │   └── DreamResult.tsx
+│   │   ├── DreamResult.tsx
+│   │   └── UpgradePopup.tsx      # One-time upgrade celebration popup
 │   ├── lib/                      # Shared utilities
 │   │   ├── auth.ts               # Auth helpers (cookie + Bearer token)
 │   │   ├── constants.ts          # App constants
@@ -97,6 +98,8 @@ dream-record/
 - `getWeeklyReports()` - Get all weekly reports
 - `getCurrentUser()` - Get current user info
 - `getRemainingFreeAnalyses()` - Get remaining free analysis count
+- `markUpgradePopupSeen()` - Mark upgrade celebration popup as seen
+- `getUpgradePopupInfo()` - Get info for showing upgrade popup
 
 #### REST API Endpoints (`src/app/api/`)
 - `POST /api/auth/login` - Login and return JWT
@@ -146,7 +149,9 @@ dream-record/
 ### User
 - id, email, password, name, username
 - role (USER/SUPERADMIN)
-- plan (FREE/DEEP)
+- plan (FREE/DEEP), planExpiresAt
+- upgradedByAdmin (Boolean) - true if admin gave trial upgrade
+- hasSeenUpgradePopup (Boolean) - true if user has seen upgrade celebration
 - lifetimeAnalysisCount, lifetimeWeeklyReportCount
 
 ### Dream

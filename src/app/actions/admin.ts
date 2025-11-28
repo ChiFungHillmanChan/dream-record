@@ -82,18 +82,36 @@ export async function updateUserPlan(
       return { success: false, error: 'Cannot modify your own plan' };
     }
     
+    // Get user's current state to determine if this is a new upgrade
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { plan: true }
+    });
+    
     let planExpiresAt: Date | null = null;
     
     if (plan === PLANS.DEEP && durationMonths) {
       planExpiresAt = new Date();
       planExpiresAt.setMonth(planExpiresAt.getMonth() + durationMonths);
     }
+
+    // If upgrading from FREE to DEEP via admin, mark as trial and reset popup flag
+    const isNewUpgrade = currentUser?.plan === PLANS.FREE && plan === PLANS.DEEP;
     
     await prisma.user.update({
       where: { id: userId },
       data: {
         plan,
         planExpiresAt,
+        // Mark as admin-upgraded trial if it's a new upgrade to DEEP
+        ...(isNewUpgrade && {
+          upgradedByAdmin: true,
+          hasSeenUpgradePopup: false, // Reset so they see the popup
+        }),
+        // If downgrading to FREE, reset the admin upgrade flag
+        ...(plan === PLANS.FREE && {
+          upgradedByAdmin: false,
+        }),
       },
     });
     
@@ -184,12 +202,30 @@ export async function updateUserPlanWithExpiry(
     if (userId === session?.userId) {
       return { success: false, error: '無法修改自己的計劃' };
     }
+
+    // Get user's current state to determine if this is a new upgrade
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { plan: true }
+    });
+
+    // If upgrading from FREE to DEEP via admin, mark as trial and reset popup flag
+    const isNewUpgrade = currentUser?.plan === PLANS.FREE && plan === PLANS.DEEP;
     
     await prisma.user.update({
       where: { id: userId },
       data: {
         plan,
         planExpiresAt: plan === PLANS.FREE ? null : planExpiresAt,
+        // Mark as admin-upgraded trial if it's a new upgrade to DEEP
+        ...(isNewUpgrade && {
+          upgradedByAdmin: true,
+          hasSeenUpgradePopup: false, // Reset so they see the popup
+        }),
+        // If downgrading to FREE, reset the admin upgrade flag
+        ...(plan === PLANS.FREE && {
+          upgradedByAdmin: false,
+        }),
       },
     });
     

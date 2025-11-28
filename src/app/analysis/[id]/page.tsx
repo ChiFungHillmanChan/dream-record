@@ -141,8 +141,54 @@ export default function AnalysisPage() {
       const dateStr = new Date(dream.createdAt).toISOString().split('T')[0];
       const fileName = `Dream_Analysis_${dateStr}.pdf`;
       
-      // Save the PDF
-      pdf.save(fileName);
+      // Get PDF as blob for better mobile compatibility
+      const pdfBlob = pdf.output('blob');
+      
+      // Check if running in iOS Safari or PWA standalone mode
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+        || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+      
+      // Try Web Share API first (best for mobile)
+      if (navigator.share && (isIOS || isStandalone)) {
+        try {
+          const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+          await navigator.share({
+            files: [file],
+            title: '夢境解析報告',
+            text: '我的夢境解析報告'
+          });
+          return;
+        } catch (shareErr) {
+          // Share was cancelled or failed, fall back to other methods
+          console.log('Share cancelled or not supported, trying alternative...');
+        }
+      }
+      
+      // Create blob URL
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      
+      // For iOS Safari and PWA - open in new tab (allows user to save/share)
+      if (isIOS || isStandalone) {
+        // Open PDF in new tab - user can then use iOS share sheet
+        const newWindow = window.open(blobUrl, '_blank');
+        if (!newWindow) {
+          // If popup blocked, create download link
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = fileName;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+        // Clean up blob URL after a delay
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      } else {
+        // Standard download for desktop browsers
+        pdf.save(fileName);
+      }
 
     } catch (err) {
       console.error('PDF Download failed:', err);

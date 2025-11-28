@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight,
   Settings, Shield, Crown, Sparkles, Plus, X
 } from 'lucide-react';
-import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo, getRemainingFreeAnalyses, getWeeklyReports, WeeklyReportData, hasNoDreamForDate } from '@/app/actions';
+import { DreamData, getDreams, saveDream, deleteDream, analyzeDream, DreamAnalysisResult, getCurrentUser, CurrentUserInfo, getRemainingFreeAnalyses, getWeeklyReports, WeeklyReportData, hasNoDreamForDate, getUpgradePopupInfo, markUpgradePopupSeen, UpgradePopupInfo } from '@/app/actions';
 import { ROLES, PLANS } from '@/lib/constants';
 import type { Dream, WeeklyReport } from '@prisma/client';
 import { clsx } from 'clsx';
@@ -17,6 +17,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { DreamLoading } from '@/components/DreamLoading';
 import { DreamResult } from '@/components/DreamResult';
+import { UpgradePopup } from '@/components/UpgradePopup';
 
 // --- Types & Constants ---
 type CalendarMode = 'month' | 'week' | 'day';
@@ -162,6 +163,10 @@ export default function DreamJournal() {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [showTagManager, setShowTagManager] = useState(false);
 
+  // Upgrade Popup State
+  const [upgradePopupInfo, setUpgradePopupInfo] = useState<UpgradePopupInfo>(null);
+  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
+
   // Constants
   const ALL_PRESET_TAGS = ['開心','可怕','感動','親情','離世','奇幻','追逐','飛翔','戀愛','工作','考試','清醒夢','噩夢','搞笑'];
   
@@ -175,12 +180,13 @@ export default function DreamJournal() {
   useEffect(() => {
     const loadInitialData = async () => {
       const todayDate = new Date().toISOString().split('T')[0];
-      const [dreamsData, reportsData, noDreamToday, user, remaining] = await Promise.all([
+      const [dreamsData, reportsData, noDreamToday, user, remaining, popupInfo] = await Promise.all([
         getDreams(),
         getWeeklyReports(),
         hasNoDreamForDate(todayDate),
         getCurrentUser(),
-        getRemainingFreeAnalyses()
+        getRemainingFreeAnalyses(),
+        getUpgradePopupInfo()
       ]);
       setDreams(dreamsData);
       setWeeklyReports(reportsData);
@@ -188,6 +194,12 @@ export default function DreamJournal() {
       setCurrentUser(user);
       setRemainingAnalyses(remaining);
       setTodayStr(new Date().toLocaleDateString());
+      
+      // Check if we should show upgrade popup
+      if (popupInfo?.shouldShow) {
+        setUpgradePopupInfo(popupInfo);
+        setShowUpgradePopup(true);
+      }
       
       // Load tags from localStorage
       const savedTags = localStorage.getItem('user_custom_tags');
@@ -212,6 +224,12 @@ export default function DreamJournal() {
     ]);
     setCurrentUser(user);
     setRemainingAnalyses(remaining);
+  };
+
+  // Handle upgrade popup close - mark as seen
+  const handleUpgradePopupClose = async () => {
+    setShowUpgradePopup(false);
+    await markUpgradePopupSeen();
   };
 
   // Detect PWA standalone mode (app added to home screen)
@@ -604,6 +622,14 @@ export default function DreamJournal() {
       <AnimatePresence>
         {isAnalyzing && <DreamLoading />}
       </AnimatePresence>
+
+      {/* Upgrade Celebration Popup */}
+      <UpgradePopup
+        isOpen={showUpgradePopup}
+        onClose={handleUpgradePopupClose}
+        isTrialUpgrade={upgradePopupInfo?.isTrialUpgrade ?? false}
+        trialDaysRemaining={upgradePopupInfo?.trialDaysRemaining ?? null}
+      />
       
       {/* Clear Confirmation Dialog */}
       <AnimatePresence>

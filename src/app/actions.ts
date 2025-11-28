@@ -17,6 +17,8 @@ export type CurrentUserInfo = {
   plan: string;
   planExpiresAt: Date | null;
   lifetimeAnalysisCount: number;
+  upgradedByAdmin: boolean;
+  hasSeenUpgradePopup: boolean;
 } | null;
 
 /**
@@ -68,6 +70,8 @@ export async function getCurrentUser(): Promise<CurrentUserInfo> {
       plan: true,
       planExpiresAt: true,
       lifetimeAnalysisCount: true,
+      upgradedByAdmin: true,
+      hasSeenUpgradePopup: true,
     },
   });
 
@@ -844,4 +848,63 @@ export async function hasNoDreamForDate(date: string): Promise<boolean> {
   });
 
   return !!existingNoDream;
+}
+
+// Mark upgrade popup as seen
+export async function markUpgradePopupSeen(): Promise<{ success: boolean }> {
+  const session = await getSession();
+  if (!session?.userId) return { success: false };
+
+  await prisma.user.update({
+    where: { id: session.userId as string },
+    data: { hasSeenUpgradePopup: true },
+  });
+
+  return { success: true };
+}
+
+// Get upgrade popup info (for showing one-time celebration)
+export type UpgradePopupInfo = {
+  shouldShow: boolean;
+  isTrialUpgrade: boolean; // true if admin gave trial
+  trialDaysRemaining: number | null; // days left if trial
+} | null;
+
+export async function getUpgradePopupInfo(): Promise<UpgradePopupInfo> {
+  const session = await getSession();
+  if (!session?.userId) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId as string },
+    select: {
+      plan: true,
+      planExpiresAt: true,
+      upgradedByAdmin: true,
+      hasSeenUpgradePopup: true,
+    },
+  });
+
+  if (!user) return null;
+
+  // Only show popup if:
+  // 1. User is on DEEP plan
+  // 2. User hasn't seen the popup yet
+  if (user.plan !== PLANS.DEEP || user.hasSeenUpgradePopup) {
+    return { shouldShow: false, isTrialUpgrade: false, trialDaysRemaining: null };
+  }
+
+  // Calculate trial days remaining if admin-upgraded
+  let trialDaysRemaining: number | null = null;
+  if (user.upgradedByAdmin && user.planExpiresAt) {
+    const now = new Date();
+    const expiresAt = new Date(user.planExpiresAt);
+    const diffMs = expiresAt.getTime() - now.getTime();
+    trialDaysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+  }
+
+  return {
+    shouldShow: true,
+    isTrialUpgrade: user.upgradedByAdmin,
+    trialDaysRemaining,
+  };
 }
