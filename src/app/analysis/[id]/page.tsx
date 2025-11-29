@@ -9,13 +9,11 @@ import { getDreamById, DreamWithAnalysis, getCurrentUser, CurrentUserInfo, Dream
 import { PLANS, ROLES } from '@/lib/constants';
 import { DreamResult } from '@/components/DreamResult';
 import { DreamLoading } from '@/components/DreamLoading';
-import { useLoading } from '@/lib/loading-context';
 import { simplePDFDownload } from '@/lib/pdf-download';
 
 export default function AnalysisPage() {
   const params = useParams();
   const router = useRouter();
-  const { setPageReady } = useLoading();
   const [dream, setDream] = useState<DreamWithAnalysis | null>(null);
   const [user, setUser] = useState<CurrentUserInfo>(null);
   const [loading, setLoading] = useState(true);
@@ -36,10 +34,9 @@ export default function AnalysisPage() {
       setDream(dreamData);
       setUser(userData);
       setLoading(false);
-      setPageReady();
     }
     loadData();
-  }, [dreamId, setPageReady]);
+  }, [dreamId]);
 
   // Generate plain text report (no emojis/formatting)
   const generatePlainTextReport = (analysisData: DreamAnalysisResult) => {

@@ -9,7 +9,6 @@ import { Loader2, Lock, Sparkles, ArrowLeft, Brain, Heart, Zap, Crown, FileText,
 import Link from 'next/link';
 import Image from 'next/image';
 import type { WeeklyReport } from '@prisma/client';
-import { useLoading } from '@/lib/loading-context';
 import { simplePDFDownload } from '@/lib/pdf-download';
 
 // Helper for tag colors (reused from main page logic)
@@ -35,16 +34,10 @@ interface WeeklyReportsClientProps {
 
 export default function WeeklyReportsClient({ initialReports, userPlan, userRole, reportStatus }: WeeklyReportsClientProps) {
   const router = useRouter();
-  const { setPageReady } = useLoading();
   const [reports, setReports] = useState<WeeklyReport[]>(initialReports);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedReport, setSelectedReport] = useState<WeeklyReport | null>(null);
   const [error, setError] = useState('');
-
-  // Signal page ready when component mounts with data
-  useEffect(() => {
-    setPageReady();
-  }, [setPageReady]);
 
   // Update local state when props change (e.g. after router.refresh())
   useEffect(() => {

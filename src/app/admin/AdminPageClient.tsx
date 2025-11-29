@@ -10,7 +10,6 @@ import {
 import Link from 'next/link';
 import { PLANS, PLAN_FEATURES, ROLES } from '@/lib/constants';
 import { updateUserPlanWithExpiry, updateUserRole, resetUserPassword, type UserListItem } from '@/app/actions/admin';
-import { useLoading } from '@/lib/loading-context';
 
 interface AdminPageClientProps {
   users: UserListItem[];
@@ -23,7 +22,6 @@ interface AdminPageClientProps {
 }
 
 export default function AdminPageClient({ users: initialUsers, stats }: AdminPageClientProps) {
-  const { setPageReady } = useLoading();
   const [users, setUsers] = useState(initialUsers);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
@@ -32,11 +30,6 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
   const [customExpiryDate, setCustomExpiryDate] = useState<string>('');
   const [newPassword, setNewPassword] = useState('');
   const [showPasswordSuccess, setShowPasswordSuccess] = useState(false);
-  
-  // Signal page ready when component mounts
-  useEffect(() => {
-    setPageReady();
-  }, [setPageReady]);
 
   const filteredUsers = users.filter(user => 
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
