@@ -5,16 +5,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useRouter } from 'next/navigation';
 import { X, Copy, CheckCircle, Sparkles, ArrowLeft, Loader2, Download } from 'lucide-react';
 import Link from 'next/link';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { getDreamById, DreamWithAnalysis, getCurrentUser, CurrentUserInfo, DreamAnalysisResult } from '@/app/actions';
 import { PLANS, ROLES } from '@/lib/constants';
 import { DreamResult } from '@/components/DreamResult';
 import { DreamLoading } from '@/components/DreamLoading';
+import { useLoading } from '@/lib/loading-context';
+import { simplePDFDownload } from '@/lib/pdf-download';
 
 export default function AnalysisPage() {
   const params = useParams();
   const router = useRouter();
+  const { setPageReady } = useLoading();
   const [dream, setDream] = useState<DreamWithAnalysis | null>(null);
   const [user, setUser] = useState<CurrentUserInfo>(null);
   const [loading, setLoading] = useState(true);
@@ -35,9 +36,10 @@ export default function AnalysisPage() {
       setDream(dreamData);
       setUser(userData);
       setLoading(false);
+      setPageReady();
     }
     loadData();
-  }, [dreamId]);
+  }, [dreamId, setPageReady]);
 
   // Generate plain text report (no emojis/formatting)
   const generatePlainTextReport = (analysisData: DreamAnalysisResult) => {
@@ -93,142 +95,10 @@ export default function AnalysisPage() {
   };
 
   const handleDownloadPDF = async () => {
-    if (!captureRef.current || !dream?.analysis) return;
-    
-    setIsDownloading(true);
-    
-    try {
-      // Wait a bit for the UI to settle
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Detect device capabilities
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isAndroid = /Android/.test(navigator.userAgent);
-      const isMobile = isIOS || isAndroid || window.innerWidth < 768;
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
-        || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-
-      // Generate filename with date
-      const dateStr = new Date(dream.createdAt).toISOString().split('T')[0];
-      const fileName = `Dream_Analysis_${dateStr}.pdf`;
-
-      // Capture the content as an image with mobile-optimized settings
-      const canvas = await html2canvas(captureRef.current, {
-        backgroundColor: '#0a0a0f',
-        scale: isMobile ? 1.5 : 2, // Lower resolution for mobile to prevent memory issues
-        useCORS: true,
-        logging: false,
-        allowTaint: true,
-        foreignObjectRendering: false,
-        removeContainer: true,
-        windowWidth: captureRef.current.scrollWidth,
-        windowHeight: captureRef.current.scrollHeight,
-      });
-      
-      const imgData = canvas.toDataURL('image/png', isMobile ? 0.8 : 1.0);
-      
-      // Create PDF
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 297; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      // Get PDF as blob
-      const pdfBlob = pdf.output('blob');
-
-      // Mobile-specific download handling
-      if (isMobile || isStandalone) {
-        // First, try Web Share API with file sharing (best UX on mobile)
-        if (navigator.canShare && navigator.share) {
-          try {
-            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-            if (navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                title: '夢境解析報告',
-                text: '我的夢境解析報告'
-              });
-              return;
-            }
-          } catch (shareErr) {
-            // Share was cancelled or not supported, continue to fallback
-            console.log('Share API not available or cancelled, trying fallback...');
-          }
-        }
-
-        // Fallback: Create object URL and use download link with proper handling
-        const blobUrl = URL.createObjectURL(pdfBlob);
-        
-        // For iOS, try opening in new window first
-        if (isIOS) {
-          // Create a hidden iframe to trigger download on iOS
-          const iframe = document.createElement('iframe');
-          iframe.style.display = 'none';
-          document.body.appendChild(iframe);
-          
-          // Try direct link click
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = fileName;
-          link.style.display = 'none';
-          document.body.appendChild(link);
-          
-          // Trigger click
-          link.click();
-          
-          // Cleanup after delay
-          setTimeout(() => {
-            document.body.removeChild(link);
-            document.body.removeChild(iframe);
-            URL.revokeObjectURL(blobUrl);
-          }, 5000);
-        } else {
-          // Android and other mobile browsers
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = fileName;
-          link.target = '_self';
-          document.body.appendChild(link);
-          link.click();
-          
-          setTimeout(() => {
-            document.body.removeChild(link);
-            URL.revokeObjectURL(blobUrl);
-          }, 5000);
-        }
-      } else {
-        // Desktop browsers - standard download
-        pdf.save(fileName);
-      }
-
-    } catch (err) {
-      console.error('PDF Download failed:', err);
-      // Provide more helpful error message
-      if (err instanceof Error && err.message.includes('memory')) {
-        alert('下載失敗：記憶體不足，請嘗試關閉其他應用程式後再試');
-      } else {
-        alert('下載失敗，請稍後再試。如持續失敗，請嘗試使用電腦版下載。');
-      }
-    } finally {
-      setIsDownloading(false);
-    }
+    if (!dream?.analysis) return;
+    const dateStr = new Date(dream.createdAt).toISOString().split('T')[0];
+    const fileName = `Dream_Analysis_${dateStr}.pdf`;
+    await simplePDFDownload(captureRef.current, fileName, setIsDownloading);
   };
 
   const handleClose = () => {

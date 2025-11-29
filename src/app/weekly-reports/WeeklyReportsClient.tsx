@@ -9,8 +9,8 @@ import { Loader2, Lock, Sparkles, ArrowLeft, Brain, Heart, Zap, Crown, FileText,
 import Link from 'next/link';
 import Image from 'next/image';
 import type { WeeklyReport } from '@prisma/client';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { useLoading } from '@/lib/loading-context';
+import { simplePDFDownload } from '@/lib/pdf-download';
 
 // Helper for tag colors (reused from main page logic)
 const TAG_PALETTE = [
@@ -35,10 +35,16 @@ interface WeeklyReportsClientProps {
 
 export default function WeeklyReportsClient({ initialReports, userPlan, userRole, reportStatus }: WeeklyReportsClientProps) {
   const router = useRouter();
+  const { setPageReady } = useLoading();
   const [reports, setReports] = useState<WeeklyReport[]>(initialReports);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedReport, setSelectedReport] = useState<WeeklyReport | null>(null);
   const [error, setError] = useState('');
+
+  // Signal page ready when component mounts with data
+  useEffect(() => {
+    setPageReady();
+  }, [setPageReady]);
 
   // Update local state when props change (e.g. after router.refresh())
   useEffect(() => {
@@ -67,6 +73,30 @@ export default function WeeklyReportsClient({ initialReports, userPlan, userRole
 
   return (
     <div className="min-h-screen text-slate-200 font-sans selection:bg-purple-500/30 pb-20">
+       {/* Generating Overlay - Cantonese message */}
+       <AnimatePresence>
+         {isGenerating && (
+           <motion.div
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center"
+           >
+             <div className="w-20 h-20 relative mb-6">
+               <motion.div
+                 animate={{ rotate: 360 }}
+                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                 className="absolute inset-0 rounded-full border-4 border-white/10 border-t-purple-500"
+               />
+               <Sparkles className="w-8 h-8 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-purple-400" />
+             </div>
+             <p className="text-xl font-bold text-white mb-2">正在生成週報...</p>
+             <p className="text-purple-300 text-sm">需要多啲時間，請耐心等待 🌙</p>
+             <p className="text-slate-500 text-xs mt-4">分析緊你嘅夢境模式...</p>
+           </motion.div>
+         )}
+       </AnimatePresence>
+
        {/* Background Elements */}
        <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <motion.div
@@ -429,141 +459,9 @@ function ReportView({ report, isFree, onBack }: { report: WeeklyReport, isFree: 
   };
 
   const handleDownloadPDF = async () => {
-    if (!reportRef.current) return;
-    setIsDownloading(true);
-
-    try {
-      // Wait a bit for the UI to settle
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Detect device capabilities
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isAndroid = /Android/.test(navigator.userAgent);
-      const isMobile = isIOS || isAndroid || window.innerWidth < 768;
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
-        || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-
-      // Generate filename with date
-      const dateStr = new Date(report.createdAt).toISOString().split('T')[0];
-      const fileName = `Weekly_Dream_Report_${dateStr}_${safeData.word_of_the_week}.pdf`;
-
-      // Capture the content as an image with mobile-optimized settings
-      const canvas = await html2canvas(reportRef.current, {
-        backgroundColor: '#0f1230',
-        scale: isMobile ? 1.5 : 2, // Lower resolution for mobile to prevent memory issues
-        useCORS: true,
-        logging: false,
-        allowTaint: true,
-        foreignObjectRendering: false,
-        removeContainer: true,
-        windowWidth: reportRef.current.scrollWidth,
-        windowHeight: reportRef.current.scrollHeight,
-      });
-
-      const imgData = canvas.toDataURL('image/png', isMobile ? 0.8 : 1.0);
-
-      // Create PDF
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 297; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      // Get PDF as blob
-      const pdfBlob = pdf.output('blob');
-
-      // Mobile-specific download handling
-      if (isMobile || isStandalone) {
-        // First, try Web Share API with file sharing (best UX on mobile)
-        if (navigator.canShare && navigator.share) {
-          try {
-            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-            if (navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                title: '夢境週報',
-                text: '我的夢境週報分析'
-              });
-              return;
-            }
-          } catch (shareErr) {
-            // Share was cancelled or not supported, continue to fallback
-            console.log('Share API not available or cancelled, trying fallback...');
-          }
-        }
-
-        // Fallback: Create object URL and use download link with proper handling
-        const blobUrl = URL.createObjectURL(pdfBlob);
-
-        // For iOS, try opening in new window first
-        if (isIOS) {
-          // Create a hidden iframe to trigger download on iOS
-          const iframe = document.createElement('iframe');
-          iframe.style.display = 'none';
-          document.body.appendChild(iframe);
-
-          // Try direct link click
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = fileName;
-          link.style.display = 'none';
-          document.body.appendChild(link);
-
-          // Trigger click
-          link.click();
-
-          // Cleanup after delay
-          setTimeout(() => {
-            document.body.removeChild(link);
-            document.body.removeChild(iframe);
-            URL.revokeObjectURL(blobUrl);
-          }, 5000);
-        } else {
-          // Android and other mobile browsers
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = fileName;
-          link.target = '_self';
-          document.body.appendChild(link);
-          link.click();
-
-          setTimeout(() => {
-            document.body.removeChild(link);
-            URL.revokeObjectURL(blobUrl);
-          }, 5000);
-        }
-      } else {
-        // Desktop browsers - standard download
-        pdf.save(fileName);
-      }
-
-    } catch (err) {
-      console.error("PDF Generation failed:", err);
-      // Provide more helpful error message
-      if (err instanceof Error && err.message.includes('memory')) {
-        alert('下載失敗：記憶體不足，請嘗試關閉其他應用程式後再試');
-      } else {
-        alert('下載失敗，請稍後再試。如持續失敗，請嘗試使用電腦版下載。');
-      }
-    } finally {
-      setIsDownloading(false);
-    }
+    const dateStr = new Date(report.createdAt).toISOString().split('T')[0];
+    const fileName = `Weekly_Dream_Report_${dateStr}_${safeData.word_of_the_week}.pdf`;
+    await simplePDFDownload(reportRef.current, fileName, setIsDownloading);
   };
 
   return (

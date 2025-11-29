@@ -6,8 +6,10 @@ import { revalidatePath } from 'next/cache';
 import type { User } from '@prisma/client';
 import { PLANS, ROLES, type PlanType } from '@/lib/constants';
 
-// Type for user list (without password)
-export type UserListItem = Omit<User, 'password'>;
+// Type for user list (without password, with dream count)
+export type UserListItem = Omit<User, 'password'> & {
+  dreamCount: number;
+};
 
 // Check if current user is superadmin
 async function requireSuperAdmin() {
@@ -28,7 +30,7 @@ async function requireSuperAdmin() {
   return session;
 }
 
-// Get all users (superadmin only)
+// Get all users with dream counts (superadmin only)
 export async function getAllUsers(): Promise<UserListItem[]> {
   await requireSuperAdmin();
   
@@ -37,16 +39,31 @@ export async function getAllUsers(): Promise<UserListItem[]> {
       id: true,
       email: true,
       name: true,
+      username: true,
       role: true,
       plan: true,
       planExpiresAt: true,
       createdAt: true,
       updatedAt: true,
+      lifetimeAnalysisCount: true,
+      lifetimeWeeklyReportCount: true,
+      upgradedByAdmin: true,
+      hasSeenUpgradePopup: true,
+      _count: {
+        select: {
+          dreams: true,
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });
   
-  return users as UserListItem[];
+  // Map to include dreamCount
+  return users.map(user => ({
+    ...user,
+    dreamCount: user._count.dreams,
+    _count: undefined, // Remove _count from the output
+  })) as UserListItem[];
 }
 
 // Get user statistics (superadmin only)

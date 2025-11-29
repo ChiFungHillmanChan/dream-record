@@ -41,6 +41,8 @@ dream-record/
 │   │   ├── auth.ts               # Auth helpers (cookie + Bearer token)
 │   │   ├── constants.ts          # App constants
 │   │   ├── jwt.ts                # JWT utilities
+│   │   ├── loading-context.tsx   # Loading state context for page transitions
+│   │   ├── pdf-download.ts       # Robust PDF download with multiple fallbacks
 │   │   └── prisma.ts             # Database client
 │   └── middleware.ts             # Route protection
 ├── mobile/                       # Flutter Mobile Application

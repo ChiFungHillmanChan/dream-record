@@ -1,9 +1,10 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { DreamLoading } from '@/components/DreamLoading';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LoadingProvider, useLoading } from '@/lib/loading-context';
 
 const LOADING_MESSAGES: Record<string, string[]> = {
   '/': [
@@ -34,6 +35,7 @@ const LOADING_MESSAGES: Record<string, string[]> = {
   '/weekly-reports': [
     "正在彙整夢境碎片...",
     "分析週期波動...",
+    "需要多啲時間，請耐心等待...",
     "生成週報圖表..."
   ]
 };
@@ -46,10 +48,24 @@ const DEFAULT_MESSAGES = [
   "揭示命運的啟示..."
 ];
 
-export default function Template({ children }: { children: React.ReactNode }) {
+// Maximum loading time before auto-dismiss (safety fallback)
+const MAX_LOADING_TIME = 8000;
+// Minimum loading time for smooth transition
+const MIN_LOADING_TIME = 800;
+
+function TemplateContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { isPageReady, resetLoading } = useLoading();
   const [isLoading, setIsLoading] = useState(true);
   const [messages, setMessages] = useState(DEFAULT_MESSAGES);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+
+  // Determine if we should still show loading
+  const showLoading = isLoading && (!isPageReady || !minTimeElapsed);
+
+  const finishLoading = useCallback(() => {
+    setIsLoading(false);
+  }, []);
 
   useEffect(() => {
     // Determine messages based on path
@@ -76,19 +92,36 @@ export default function Template({ children }: { children: React.ReactNode }) {
     
     setMessages(currentMessages);
     setIsLoading(true);
+    setMinTimeElapsed(false);
+    resetLoading();
 
-    // Short loading duration to ensure smooth transition
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500);
+    // Minimum loading time for smooth visual transition
+    const minTimer = setTimeout(() => {
+      setMinTimeElapsed(true);
+    }, MIN_LOADING_TIME);
 
-    return () => clearTimeout(timer);
-  }, [pathname]);
+    // Maximum loading time (safety fallback)
+    const maxTimer = setTimeout(() => {
+      finishLoading();
+    }, MAX_LOADING_TIME);
+
+    return () => {
+      clearTimeout(minTimer);
+      clearTimeout(maxTimer);
+    };
+  }, [pathname, resetLoading, finishLoading]);
+
+  // When page is ready and minimum time has elapsed, finish loading
+  useEffect(() => {
+    if (isPageReady && minTimeElapsed) {
+      finishLoading();
+    }
+  }, [isPageReady, minTimeElapsed, finishLoading]);
 
   return (
     <>
       <AnimatePresence mode="wait">
-        {isLoading && <DreamLoading key="loader" messages={messages} />}
+        {showLoading && <DreamLoading key="loader" messages={messages} />}
       </AnimatePresence>
       <motion.div
         key={pathname}
@@ -102,3 +135,10 @@ export default function Template({ children }: { children: React.ReactNode }) {
   );
 }
 
+export default function Template({ children }: { children: React.ReactNode }) {
+  return (
+    <LoadingProvider>
+      <TemplateContent>{children}</TemplateContent>
+    </LoadingProvider>
+  );
+}

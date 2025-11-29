@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Crown, Shield, ArrowLeft, Search, 
   Calendar, Mail, User as UserIcon, Sparkles,
-  X, Check, Key, RefreshCw
+  X, Check, Key, RefreshCw, Moon
 } from 'lucide-react';
 import Link from 'next/link';
 import { PLANS, PLAN_FEATURES, ROLES } from '@/lib/constants';
@@ -232,13 +232,14 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr className="border-b border-white/10">
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400">用戶</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400">計劃</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400">到期日</th>
-                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400">操作</th>
+                <th className="text-left py-3 px-2 md:px-4 text-xs font-medium text-gray-400">用戶</th>
+                <th className="text-left py-3 px-2 md:px-4 text-xs font-medium text-gray-400 whitespace-nowrap">計劃</th>
+                <th className="text-left py-3 px-2 md:px-4 text-xs font-medium text-gray-400 whitespace-nowrap">到期日</th>
+                <th className="text-center py-3 px-2 md:px-4 text-xs font-medium text-gray-400 whitespace-nowrap">夢境數</th>
+                <th className="text-right py-3 px-2 md:px-4 text-xs font-medium text-gray-400 whitespace-nowrap">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -250,42 +251,48 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
                   transition={{ delay: index * 0.05 }}
                   className="border-b border-white/5 hover:bg-white/5 transition-colors"
                 >
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent to-accent2 flex items-center justify-center text-white font-bold">
+                  <td className="py-3 md:py-4 px-2 md:px-4">
+                    <div className="flex items-center gap-2 md:gap-3">
+                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-accent to-accent2 flex items-center justify-center text-white font-bold text-sm md:text-base flex-shrink-0">
                         {user.name?.[0] ?? user.email[0].toUpperCase()}
                       </div>
-                      <div>
-                        <div className="text-white font-medium">{user.name ?? '未設定'}</div>
-                        <div className="text-xs text-gray-400 flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          {user.email}
+                      <div className="min-w-0">
+                        <div className="text-white font-medium text-sm md:text-base truncate">{user.name ?? '未設定'}</div>
+                        <div className="text-[10px] md:text-xs text-gray-400 flex items-center gap-1 truncate">
+                          <Mail className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{user.email}</span>
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-3 md:py-4 px-2 md:px-4">
                     {user.plan === PLANS.DEEP ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] md:text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 whitespace-nowrap">
                         <Crown className="w-3 h-3" />
                         深度版
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] md:text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30 whitespace-nowrap">
                         免費版
                       </span>
                     )}
                   </td>
-                  <td className="py-4 px-4">
-                    <span className="text-sm text-gray-400 flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
+                  <td className="py-3 md:py-4 px-2 md:px-4">
+                    <span className="text-[10px] md:text-sm text-gray-400 flex items-center gap-1 whitespace-nowrap">
+                      <Calendar className="w-3 h-3 flex-shrink-0" />
                       {formatDate(user.planExpiresAt)}
                     </span>
                   </td>
-                  <td className="py-4 px-4 text-right">
+                  <td className="py-3 md:py-4 px-2 md:px-4 text-center">
+                    <span className="inline-flex items-center gap-1 text-sm text-purple-300">
+                      <Moon className="w-3 h-3" />
+                      {user.dreamCount}
+                    </span>
+                  </td>
+                  <td className="py-3 md:py-4 px-2 md:px-4 text-right">
                     <button
                       onClick={() => openUserModal(user)}
-                      className="px-3 py-1.5 text-sm bg-accent/20 hover:bg-accent/30 text-accent border border-accent/30 rounded-lg transition-colors"
+                      className="px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-sm bg-accent/20 hover:bg-accent/30 text-accent border border-accent/30 rounded-lg transition-colors whitespace-nowrap"
                     >
                       編輯
                     </button>

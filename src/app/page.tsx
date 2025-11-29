@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import { DreamLoading } from '@/components/DreamLoading';
 import { DreamResult } from '@/components/DreamResult';
 import { UpgradePopup } from '@/components/UpgradePopup';
+import { useLoading } from '@/lib/loading-context';
 
 // --- Types & Constants ---
 type CalendarMode = 'month' | 'week' | 'day';
@@ -119,6 +120,7 @@ const Chip = ({ label, active, onClick, onRemove }: { label: string, active?: bo
 
 export default function DreamJournal() {
   const router = useRouter();
+  const { setPageReady } = useLoading();
   
   // Data State
   const [dreams, setDreams] = useState<Dream[]>([]);
@@ -212,10 +214,13 @@ export default function DreamJournal() {
       } else {
           setAvailableTags(['開心', '可怕', '親情', '奇幻', '戀愛']);
       }
+      
+      // Signal that page data is loaded
+      setPageReady();
     };
     
     loadInitialData();
-  }, []);
+  }, [setPageReady]);
 
   const loadCurrentUser = async () => {
     const [user, remaining] = await Promise.all([
