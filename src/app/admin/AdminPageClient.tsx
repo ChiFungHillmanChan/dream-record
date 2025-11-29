@@ -9,7 +9,15 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { PLANS, PLAN_FEATURES, ROLES } from '@/lib/constants';
-import { updateUserPlanWithExpiry, updateUserRole, resetUserPassword, type UserListItem } from '@/app/actions/admin';
+import { 
+  updateUserPlanWithExpiry, 
+  updateUserRole, 
+  resetUserPassword, 
+  resetUserDailyAnalysisUsage,
+  resetUserWeeklyReportUsage,
+  type UserListItem 
+} from '@/app/actions/admin';
+import { RotateCcw, Brain, FileText } from 'lucide-react';
 
 interface AdminPageClientProps {
   users: UserListItem[];
@@ -111,6 +119,58 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
     } else {
       alert(result.error ?? '更新角色失敗');
+    }
+    setIsUpdating(false);
+  };
+
+  const handleResetDailyAnalysis = async (userId: string) => {
+    if (!confirm('確定要重設此用戶的每日解析次數嗎？\n（免費用戶將恢復 20 次額度）')) {
+      return;
+    }
+    
+    setIsUpdating(true);
+    const result = await resetUserDailyAnalysisUsage(userId);
+    
+    if (result.success) {
+      // Update local state
+      setUsers(prev => prev.map(u => {
+        if (u.id === userId) {
+          return { ...u, lifetimeAnalysisCount: 0 };
+        }
+        return u;
+      }));
+      if (selectedUser && selectedUser.id === userId) {
+        setSelectedUser({ ...selectedUser, lifetimeAnalysisCount: 0 });
+      }
+      alert('每日解析次數已重設成功！');
+    } else {
+      alert(result.error ?? '重設失敗');
+    }
+    setIsUpdating(false);
+  };
+
+  const handleResetWeeklyReport = async (userId: string) => {
+    if (!confirm('確定要重設此用戶的週報次數嗎？\n（免費用戶將恢復 3 次額度）')) {
+      return;
+    }
+    
+    setIsUpdating(true);
+    const result = await resetUserWeeklyReportUsage(userId);
+    
+    if (result.success) {
+      // Update local state
+      setUsers(prev => prev.map(u => {
+        if (u.id === userId) {
+          return { ...u, lifetimeWeeklyReportCount: 0 };
+        }
+        return u;
+      }));
+      if (selectedUser && selectedUser.id === userId) {
+        setSelectedUser({ ...selectedUser, lifetimeWeeklyReportCount: 0 });
+      }
+      alert('週報次數已重設成功！');
+    } else {
+      alert(result.error ?? '重設失敗');
     }
     setIsUpdating(false);
   };
@@ -514,6 +574,63 @@ export default function AdminPageClient({ users: initialUsers, stats }: AdminPag
                     </div>
                   </div>
                 )}
+
+                {/* Usage Reset Section */}
+                <div>
+                  <label className="text-sm font-medium text-gray-300 mb-2 block">使用量重設</label>
+                  <div className="p-4 bg-white/5 rounded-2xl space-y-3">
+                    {/* Current Usage Stats */}
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                        <div className="flex items-center gap-1 text-blue-400 mb-1">
+                          <Brain className="w-3 h-3" />
+                          每日解析
+                        </div>
+                        <div className="text-white font-medium">
+                          已用 {selectedUser.lifetimeAnalysisCount} 次
+                          {selectedUser.plan === PLANS.FREE && (
+                            <span className="text-gray-400 text-xs"> / 20 次</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                        <div className="flex items-center gap-1 text-purple-400 mb-1">
+                          <FileText className="w-3 h-3" />
+                          週報生成
+                        </div>
+                        <div className="text-white font-medium">
+                          已用 {selectedUser.lifetimeWeeklyReportCount} 次
+                          {selectedUser.plan === PLANS.FREE && (
+                            <span className="text-gray-400 text-xs"> / 3 次</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Reset Buttons */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleResetDailyAnalysis(selectedUser.id)}
+                        disabled={isUpdating}
+                        className="p-2 rounded-lg border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                      >
+                        <RotateCcw className={`w-3 h-3 ${isUpdating ? 'animate-spin' : ''}`} />
+                        重設解析
+                      </button>
+                      <button
+                        onClick={() => handleResetWeeklyReport(selectedUser.id)}
+                        disabled={isUpdating}
+                        className="p-2 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                      >
+                        <RotateCcw className={`w-3 h-3 ${isUpdating ? 'animate-spin' : ''}`} />
+                        重設週報
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      重設後，免費用戶可恢復使用額度。已生成的報告不會被刪除。
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-6 flex justify-end">

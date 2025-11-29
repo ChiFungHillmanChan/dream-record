@@ -38,7 +38,6 @@ export default function SettingsForm({ user, showSuperAdminSetup = false }: Sett
   const [isSettingUpAdmin, setIsSettingUpAdmin] = useState(false);
   const [adminSetupError, setAdminSetupError] = useState<string | null>(null);
   
-  
   // Stripe checkout state
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [isCheckingOut, setIsCheckingOut] = useState(false);

@@ -254,3 +254,68 @@ export async function updateUserPlanWithExpiry(
   }
 }
 
+// Reset user's daily analysis usage (superadmin only)
+// This resets lifetimeAnalysisCount to 0 (free users have 20 lifetime)
+export async function resetUserDailyAnalysisUsage(
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireSuperAdmin();
+    
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lifetimeAnalysisCount: 0 },
+    });
+    
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error) {
+    console.error('Reset daily analysis usage error:', error);
+    return { success: false, error: '重設每日解析次數失敗' };
+  }
+}
+
+// Reset user's weekly report usage (superadmin only)
+// This resets lifetimeWeeklyReportCount to 0 (free users have 3 lifetime)
+export async function resetUserWeeklyReportUsage(
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireSuperAdmin();
+    
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lifetimeWeeklyReportCount: 0 },
+    });
+    
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error) {
+    console.error('Reset weekly report usage error:', error);
+    return { success: false, error: '重設週報次數失敗' };
+  }
+}
+
+// Get user's current usage stats (for display in admin panel)
+export async function getUserUsageStats(userId: string): Promise<{
+  lifetimeAnalysisCount: number;
+  lifetimeWeeklyReportCount: number;
+} | null> {
+  try {
+    await requireSuperAdmin();
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        lifetimeAnalysisCount: true,
+        lifetimeWeeklyReportCount: true,
+      },
+    });
+    
+    return user;
+  } catch (error) {
+    console.error('Get user usage stats error:', error);
+    return null;
+  }
+}
+

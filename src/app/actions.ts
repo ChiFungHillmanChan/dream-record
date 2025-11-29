@@ -435,13 +435,17 @@ export async function generateWeeklyReport(): Promise<{ success: boolean; error?
 
   // Determine if user has premium access (DEEP plan or SUPERADMIN)
   const isPremium = user.plan === PLANS.DEEP || user.role === ROLES.SUPERADMIN;
+  const isSuperAdmin = user.role === ROLES.SUPERADMIN;
 
   // Get current week boundaries (Sunday to Saturday)
   const { weekStart, weekEnd } = getCurrentWeekBoundaries();
 
   // Check report limits
-  if (isPremium) {
-    // DEEP/SUPERADMIN: 2 reports per week
+  // SUPERADMIN has unlimited weekly reports (no limit check)
+  if (isSuperAdmin) {
+    // No limit check for SUPERADMIN - they have unlimited access
+  } else if (isPremium) {
+    // DEEP: 2 reports per week
     const reportsThisWeek = await prisma.weeklyReport.count({
       where: {
         userId: user.id,
@@ -742,14 +746,27 @@ export async function getWeeklyReportStatus(): Promise<WeeklyReportStatus | null
   if (!user) return null;
 
   const isPremium = user.plan === PLANS.DEEP || user.role === ROLES.SUPERADMIN;
+  const isSuperAdmin = user.role === ROLES.SUPERADMIN;
   
   const { weekStart, weekEnd } = getCurrentWeekBoundaries();
 
   let reportsUsed: number;
   let reportsLimit: number;
   
-  if (isPremium) {
-    // DEEP/SUPERADMIN: 2 per week
+  if (isSuperAdmin) {
+    // SUPERADMIN: Unlimited (show current week count but no limit)
+    reportsUsed = await prisma.weeklyReport.count({
+      where: {
+        userId: user.id,
+        createdAt: {
+          gte: weekStart,
+          lte: weekEnd
+        }
+      }
+    });
+    reportsLimit = -1; // -1 means unlimited
+  } else if (isPremium) {
+    // DEEP: 2 per week
     reportsUsed = await prisma.weeklyReport.count({
       where: {
         userId: user.id,
@@ -782,7 +799,8 @@ export async function getWeeklyReportStatus(): Promise<WeeklyReportStatus | null
   const daysRequired = isPremium 
     ? WEEKLY_REPORT_CONFIG.DEEP.minDaysRequired 
     : WEEKLY_REPORT_CONFIG.FREE.minDaysRequired;
-  const canGenerate = reportsUsed < reportsLimit && daysRecorded >= daysRequired;
+  // SUPERADMIN (reportsLimit = -1) always passes limit check
+  const canGenerate = (reportsLimit === -1 || reportsUsed < reportsLimit) && daysRecorded >= daysRequired;
 
   return {
     reportsUsed,

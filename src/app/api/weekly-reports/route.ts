@@ -77,10 +77,14 @@ export async function POST() {
   }
 
   const isPremium = user.plan === PLANS.DEEP || user.role === ROLES.SUPERADMIN;
+  const isSuperAdmin = user.role === ROLES.SUPERADMIN;
   const { weekStart, weekEnd } = getCurrentWeekBoundaries();
 
   // Check report limits
-  if (isPremium) {
+  // SUPERADMIN has unlimited weekly reports (no limit check)
+  if (isSuperAdmin) {
+    // No limit check for SUPERADMIN - they have unlimited access
+  } else if (isPremium) {
     const reportsThisWeek = await prisma.weeklyReport.count({
       where: {
         userId: user.id,
