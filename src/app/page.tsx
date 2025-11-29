@@ -19,6 +19,7 @@ import { DreamLoading } from '@/components/DreamLoading';
 import { DreamResult } from '@/components/DreamResult';
 import { UpgradePopup } from '@/components/UpgradePopup';
 import { useLoading } from '@/lib/loading-context';
+import { useAppStore } from '@/lib/app-store';
 
 // --- Types & Constants ---
 type CalendarMode = 'month' | 'week' | 'day';
@@ -122,11 +123,26 @@ export default function DreamJournal() {
   const router = useRouter();
   const { setPageReady } = useLoading();
   
-  // Data State
-  const [dreams, setDreams] = useState<Dream[]>([]);
-  const [weeklyReports, setWeeklyReports] = useState<WeeklyReport[]>([]);
-  const [currentUser, setCurrentUser] = useState<CurrentUserInfo>(null);
-  const [remainingAnalyses, setRemainingAnalyses] = useState<number>(20); // Initialize with default free limit
+  // Global store for cached data
+  const {
+    currentUser: cachedUser,
+    dreams: cachedDreams,
+    weeklyReports: cachedReports,
+    remainingAnalyses: cachedRemainingAnalyses,
+    isInitialLoadComplete,
+    isDataStale,
+    setCurrentUser: setCachedUser,
+    setDreams: setCachedDreams,
+    setWeeklyReports: setCachedReports,
+    setRemainingAnalyses: setCachedRemainingAnalyses,
+    markInitialLoadComplete,
+  } = useAppStore();
+  
+  // Local state (initialized from cache if available)
+  const [dreams, setDreams] = useState<Dream[]>(cachedDreams);
+  const [weeklyReports, setWeeklyReports] = useState<WeeklyReport[]>(cachedReports);
+  const [currentUser, setCurrentUser] = useState<CurrentUserInfo>(cachedUser);
+  const [remainingAnalyses, setRemainingAnalyses] = useState<number>(cachedRemainingAnalyses);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'record' | 'history'>('record');
@@ -182,6 +198,36 @@ export default function DreamJournal() {
   useEffect(() => {
     const loadInitialData = async () => {
       const todayDate = new Date().toISOString().split('T')[0];
+      
+      // Check if we have valid cached data
+      const hasCachedData = isInitialLoadComplete && !isDataStale();
+      
+      if (hasCachedData) {
+        // Use cached data - only fetch things that change frequently
+        setTodayStr(new Date().toLocaleDateString());
+        
+        // Still check for no dream today (this is date-specific)
+        const noDreamToday = await hasNoDreamForDate(todayDate);
+        setHasNoDreamToday(noDreamToday);
+        
+        // Load tags from localStorage
+        const savedTags = localStorage.getItem('user_custom_tags');
+        if (savedTags) {
+          try {
+            setAvailableTags(JSON.parse(savedTags));
+          } catch {
+            setAvailableTags(['開心', '可怕', '親情', '奇幻', '戀愛']);
+          }
+        } else {
+          setAvailableTags(['開心', '可怕', '親情', '奇幻', '戀愛']);
+        }
+        
+        // Signal page ready immediately
+        setPageReady();
+        return;
+      }
+      
+      // Fetch fresh data
       const [dreamsData, reportsData, noDreamToday, user, remaining, popupInfo] = await Promise.all([
         getDreams(),
         getWeeklyReports(),
@@ -190,12 +236,21 @@ export default function DreamJournal() {
         getRemainingFreeAnalyses(),
         getUpgradePopupInfo()
       ]);
+      
+      // Update local state
       setDreams(dreamsData);
       setWeeklyReports(reportsData);
       setHasNoDreamToday(noDreamToday);
       setCurrentUser(user);
       setRemainingAnalyses(remaining);
       setTodayStr(new Date().toLocaleDateString());
+      
+      // Update global cache
+      setCachedDreams(dreamsData);
+      setCachedReports(reportsData);
+      setCachedUser(user);
+      setCachedRemainingAnalyses(remaining);
+      markInitialLoadComplete();
       
       // Check if we should show upgrade popup
       if (popupInfo?.shouldShow) {
@@ -220,15 +275,19 @@ export default function DreamJournal() {
     };
     
     loadInitialData();
-  }, [setPageReady]);
+  }, [setPageReady, isInitialLoadComplete, isDataStale, setCachedDreams, setCachedReports, setCachedUser, setCachedRemainingAnalyses, markInitialLoadComplete]);
 
   const loadCurrentUser = async () => {
     const [user, remaining] = await Promise.all([
       getCurrentUser(),
       getRemainingFreeAnalyses()
     ]);
+    // Update local state
     setCurrentUser(user);
     setRemainingAnalyses(remaining);
+    // Update cache
+    setCachedUser(user);
+    setCachedRemainingAnalyses(remaining);
   };
 
   // Handle upgrade popup close - mark as seen
@@ -443,9 +502,13 @@ export default function DreamJournal() {
       getWeeklyReports(),
       hasNoDreamForDate(todayDate)
     ]);
+    // Update local state
     setDreams(dreamsData);
     setWeeklyReports(reportsData);
     setHasNoDreamToday(noDreamToday);
+    // Update cache
+    setCachedDreams(dreamsData);
+    setCachedReports(reportsData);
   };
 
   // Stats

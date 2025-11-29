@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { DreamLoading } from '@/components/DreamLoading';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LoadingProvider, useLoading } from '@/lib/loading-context';
+import { useAppStore } from '@/lib/app-store';
 
 const LOADING_MESSAGES: Record<string, string[]> = {
   '/': [
@@ -48,26 +49,47 @@ const DEFAULT_MESSAGES = [
   "揭示命運的啟示..."
 ];
 
+// Pages that don't require data loading (skip loading screen if cached)
+const CACHED_PAGES = ['/', '/settings', '/weekly-reports', '/admin'];
+
 // Maximum loading time before auto-dismiss (safety fallback)
 const MAX_LOADING_TIME = 8000;
-// Minimum loading time for smooth transition
-const MIN_LOADING_TIME = 800;
+// Minimum loading time for smooth transition (only on first load)
+const MIN_LOADING_TIME_FIRST = 800;
+// Quick transition for cached data
+const MIN_LOADING_TIME_CACHED = 200;
 
 function TemplateContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isPageReady, resetLoading } = useLoading();
+  const { isInitialLoadComplete, isDataStale } = useAppStore();
+  
   const [isLoading, setIsLoading] = useState(true);
   const [messages, setMessages] = useState(DEFAULT_MESSAGES);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
-  // Determine if we should still show loading
-  const showLoading = isLoading && (!isPageReady || !minTimeElapsed);
+  // Check if this is a page that can use cached data
+  const canUseCachedData = CACHED_PAGES.some(p => 
+    p === pathname || (p !== '/' && pathname.startsWith(p))
+  );
+  
+  // Skip loading screen if we have cached data and it's not stale
+  const hasCachedData = isInitialLoadComplete && !isDataStale() && canUseCachedData;
+  
+  // Determine if we should show loading
+  const showLoading = isLoading && !hasCachedData && (!isPageReady || !minTimeElapsed);
 
   const finishLoading = useCallback(() => {
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
+    // If we have cached data, skip loading immediately
+    if (hasCachedData) {
+      setIsLoading(false);
+      return;
+    }
+    
     // Determine messages based on path
     let currentMessages = DEFAULT_MESSAGES;
     
@@ -95,10 +117,13 @@ function TemplateContent({ children }: { children: React.ReactNode }) {
     setMinTimeElapsed(false);
     resetLoading();
 
+    // Use shorter minimum time if we already have some cached data
+    const minLoadingTime = isInitialLoadComplete ? MIN_LOADING_TIME_CACHED : MIN_LOADING_TIME_FIRST;
+
     // Minimum loading time for smooth visual transition
     const minTimer = setTimeout(() => {
       setMinTimeElapsed(true);
-    }, MIN_LOADING_TIME);
+    }, minLoadingTime);
 
     // Maximum loading time (safety fallback)
     const maxTimer = setTimeout(() => {
@@ -109,7 +134,7 @@ function TemplateContent({ children }: { children: React.ReactNode }) {
       clearTimeout(minTimer);
       clearTimeout(maxTimer);
     };
-  }, [pathname, resetLoading, finishLoading]);
+  }, [pathname, resetLoading, finishLoading, hasCachedData, isInitialLoadComplete]);
 
   // When page is ready and minimum time has elapsed, finish loading
   useEffect(() => {
@@ -125,9 +150,9 @@ function TemplateContent({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
       <motion.div
         key={pathname}
-        initial={{ opacity: 0 }}
+        initial={{ opacity: hasCachedData ? 1 : 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
+        transition={{ duration: hasCachedData ? 0.15 : 0.5, delay: hasCachedData ? 0 : 0.2 }}
       >
         {children}
       </motion.div>

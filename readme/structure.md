@@ -38,6 +38,7 @@ dream-record/
 │   │   ├── DreamResult.tsx
 │   │   └── UpgradePopup.tsx      # One-time upgrade celebration popup
 │   ├── lib/                      # Shared utilities
+│   │   ├── app-store.ts          # Zustand global store for data caching
 │   │   ├── auth.ts               # Auth helpers (cookie + Bearer token)
 │   │   ├── constants.ts          # App constants
 │   │   ├── jwt.ts                # JWT utilities
