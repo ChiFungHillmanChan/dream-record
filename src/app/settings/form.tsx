@@ -9,6 +9,7 @@ import { User, Mail, Lock, Save, Trash2, LogOut, Settings as SettingsIcon, Arrow
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { PLANS, PLAN_FEATURES, PLAN_PRICING, ROLES } from '@/lib/constants';
+import { useLoading } from '@/lib/loading-context';
 
 const initialState = {
   message: '',
@@ -33,10 +34,16 @@ interface SettingsFormProps {
 }
 
 export default function SettingsForm({ user, showSuperAdminSetup = false }: SettingsFormProps) {
+  const { setPageReady } = useLoading();
   const [state, formAction, isPending] = useActionState(updateSettings, initialState);
   const [deleteState, deleteAction, isDeletePending] = useActionState(deleteAccount, deleteInitialState);
   const [isSettingUpAdmin, setIsSettingUpAdmin] = useState(false);
   const [adminSetupError, setAdminSetupError] = useState<string | null>(null);
+  
+  // Signal page ready when component mounts
+  useEffect(() => {
+    setPageReady();
+  }, [setPageReady]);
   
   // Stripe checkout state
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');

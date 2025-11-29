@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
 interface LoadingContextType {
   isPageReady: boolean;
@@ -8,7 +8,7 @@ interface LoadingContextType {
   resetLoading: () => void;
 }
 
-const LoadingContext = createContext<LoadingContextType | null>(null);
+const LoadingContext = createContext<LoadingContextType | undefined>(undefined);
 
 export function LoadingProvider({ children }: { children: ReactNode }) {
   const [isPageReady, setIsPageReady] = useState(false);
@@ -30,20 +30,8 @@ export function LoadingProvider({ children }: { children: ReactNode }) {
 
 export function useLoading() {
   const context = useContext(LoadingContext);
-  if (!context) {
-    throw new Error('useLoading must be used within LoadingProvider');
+  if (context === undefined) {
+    throw new Error('useLoading must be used within a LoadingProvider');
   }
   return context;
 }
-
-// Hook to automatically set page ready when data is loaded
-export function usePageReady(isDataLoaded: boolean) {
-  const { setPageReady } = useLoading();
-  
-  // Call setPageReady when data is loaded
-  if (isDataLoaded) {
-    setPageReady();
-  }
-}
-
-

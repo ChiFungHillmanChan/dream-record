@@ -18,8 +18,8 @@ import { useRouter } from 'next/navigation';
 import { DreamLoading } from '@/components/DreamLoading';
 import { DreamResult } from '@/components/DreamResult';
 import { UpgradePopup } from '@/components/UpgradePopup';
-import { useLoading } from '@/lib/loading-context';
 import { useAppStore } from '@/lib/app-store';
+import { useLoading } from '@/lib/loading-context';
 
 // --- Types & Constants ---
 type CalendarMode = 'month' | 'week' | 'day';

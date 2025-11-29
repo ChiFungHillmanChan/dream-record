@@ -1,11 +1,10 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
-import { DreamLoading } from '@/components/DreamLoading';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DreamLoading } from '@/components/DreamLoading';
 import { LoadingProvider, useLoading } from '@/lib/loading-context';
-import { useAppStore } from '@/lib/app-store';
 
 const LOADING_MESSAGES: Record<string, string[]> = {
   '/': [
@@ -44,120 +43,70 @@ const LOADING_MESSAGES: Record<string, string[]> = {
 const DEFAULT_MESSAGES = [
   "正在連結靈魂深處...",
   "解讀天機符號...",
-  "感應情緒脈絡...",
-  "聆聽潛意識的低語...",
-  "揭示命運的啟示..."
+  "感應情緒脈絡..."
 ];
-
-// Pages that can use cached client-side data (skip loading screen if cached)
-// Note: Server-rendered pages like /weekly-reports, /admin should NOT be here
-// because they fetch fresh data on the server each time
-const CACHED_PAGES = ['/', '/settings'];
-
-// Maximum loading time before auto-dismiss (safety fallback)
-const MAX_LOADING_TIME = 8000;
-// Minimum loading time for smooth transition (only on first load)
-const MIN_LOADING_TIME_FIRST = 800;
-// Quick transition for cached data
-const MIN_LOADING_TIME_CACHED = 200;
 
 function TemplateContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isPageReady, resetLoading } = useLoading();
-  const { isInitialLoadComplete, isDataStale } = useAppStore();
-  
-  const [isLoading, setIsLoading] = useState(true);
+  const [showLoading, setShowLoading] = useState(true);
   const [messages, setMessages] = useState(DEFAULT_MESSAGES);
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
-  // Check if this is a page that can use cached data
-  const canUseCachedData = CACHED_PAGES.some(p => 
-    p === pathname || (p !== '/' && pathname.startsWith(p))
-  );
-  
-  // Skip loading screen if we have cached data and it's not stale
-  const hasCachedData = isInitialLoadComplete && !isDataStale() && canUseCachedData;
-  
-  // Determine if we should show loading
-  const showLoading = isLoading && !hasCachedData && (!isPageReady || !minTimeElapsed);
-
-  const finishLoading = useCallback(() => {
-    setIsLoading(false);
-  }, []);
-
+  // Reset loading state when pathname changes
   useEffect(() => {
-    // If we have cached data, skip loading immediately
-    if (hasCachedData) {
-      setIsLoading(false);
-      return;
-    }
-    
-    // Determine messages based on path
+    // Get messages for this path
     let currentMessages = DEFAULT_MESSAGES;
-    
-    // Exact match
     if (LOADING_MESSAGES[pathname]) {
       currentMessages = LOADING_MESSAGES[pathname];
-    } else {
-      // Partial match (e.g. /analysis/123)
-      const key = Object.keys(LOADING_MESSAGES).find(key => 
-        key !== '/' && pathname.startsWith(key)
-      );
-      if (key) {
-        currentMessages = LOADING_MESSAGES[key];
-      } else if (pathname.startsWith('/analysis/')) {
-        currentMessages = [
-          "正在準備分析報告...",
-          "讀取夢境解析...",
-          "呈現潛意識洞察..."
-        ];
-      }
+    } else if (pathname.startsWith('/analysis/')) {
+      currentMessages = [
+        "正在準備分析報告...",
+        "讀取夢境解析...",
+        "呈現潛意識洞察..."
+      ];
     }
     
     setMessages(currentMessages);
-    setIsLoading(true);
-    setMinTimeElapsed(false);
+    setShowLoading(true);
     resetLoading();
+    
+    // Safety timeout - max 10 seconds loading
+    const safetyTimer = setTimeout(() => {
+      setShowLoading(false);
+    }, 10000);
+    
+    return () => clearTimeout(safetyTimer);
+  }, [pathname, resetLoading]);
 
-    // Use shorter minimum time if we already have some cached data
-    const minLoadingTime = isInitialLoadComplete ? MIN_LOADING_TIME_CACHED : MIN_LOADING_TIME_FIRST;
-
-    // Minimum loading time for smooth visual transition
-    const minTimer = setTimeout(() => {
-      setMinTimeElapsed(true);
-    }, minLoadingTime);
-
-    // Maximum loading time (safety fallback)
-    const maxTimer = setTimeout(() => {
-      finishLoading();
-    }, MAX_LOADING_TIME);
-
-    return () => {
-      clearTimeout(minTimer);
-      clearTimeout(maxTimer);
-    };
-  }, [pathname, resetLoading, finishLoading, hasCachedData, isInitialLoadComplete]);
-
-  // When page is ready and minimum time has elapsed, finish loading
+  // When page signals ready, hide loading
   useEffect(() => {
-    if (isPageReady && minTimeElapsed) {
-      finishLoading();
+    if (isPageReady) {
+      // Small delay for smooth transition
+      const timer = setTimeout(() => {
+        setShowLoading(false);
+      }, 300);
+      return () => clearTimeout(timer);
     }
-  }, [isPageReady, minTimeElapsed, finishLoading]);
+  }, [isPageReady]);
 
   return (
     <>
       <AnimatePresence mode="wait">
-        {showLoading && <DreamLoading key="loader" messages={messages} />}
+        {showLoading && (
+          <motion.div
+            key="loader"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-[9999]"
+          >
+            <DreamLoading messages={messages} />
+          </motion.div>
+        )}
       </AnimatePresence>
-      <motion.div
-        key={pathname}
-        initial={{ opacity: hasCachedData ? 1 : 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: hasCachedData ? 0.15 : 0.5, delay: hasCachedData ? 0 : 0.2 }}
-      >
+      <div style={{ visibility: showLoading ? 'hidden' : 'visible' }}>
         {children}
-      </motion.div>
+      </div>
     </>
   );
 }
