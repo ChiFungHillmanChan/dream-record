@@ -49,8 +49,10 @@ const DEFAULT_MESSAGES = [
   "揭示命運的啟示..."
 ];
 
-// Pages that don't require data loading (skip loading screen if cached)
-const CACHED_PAGES = ['/', '/settings', '/weekly-reports', '/admin'];
+// Pages that can use cached client-side data (skip loading screen if cached)
+// Note: Server-rendered pages like /weekly-reports, /admin should NOT be here
+// because they fetch fresh data on the server each time
+const CACHED_PAGES = ['/', '/settings'];
 
 // Maximum loading time before auto-dismiss (safety fallback)
 const MAX_LOADING_TIME = 8000;

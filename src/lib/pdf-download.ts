@@ -56,15 +56,25 @@ async function tryBlobDownload(pdfBlob: Blob, fileName: string): Promise<boolean
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = fileName;
-    link.style.display = 'none';
+    link.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
     document.body.appendChild(link);
     
-    // Use click event for better compatibility
-    link.click();
+    // Use MouseEvent for better cross-browser compatibility
+    const clickEvent = new MouseEvent('click', {
+      view: window,
+      bubbles: true,
+      cancelable: true
+    });
+    link.dispatchEvent(clickEvent);
+    
+    // Wait a bit to ensure download starts
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     // Cleanup
     setTimeout(() => {
-      document.body.removeChild(link);
+      if (link.parentNode) {
+        document.body.removeChild(link);
+      }
       URL.revokeObjectURL(blobUrl);
     }, 10000);
     
@@ -203,20 +213,22 @@ export async function downloadPDF(options: PDFDownloadOptions): Promise<PDFDownl
         return { success: true, method: 'open' };
       }
     } else {
-      // Desktop: Try direct save first
+      // Desktop: Try blob download first (more reliable than pdf.save)
+      if (await tryBlobDownload(pdfBlob, fileName)) {
+        return { success: true, method: 'download' };
+      }
+      
+      // Try direct save as fallback
       try {
         pdf.save(fileName);
         return { success: true, method: 'download' };
-      } catch {
-        // Try blob download as fallback
-        if (await tryBlobDownload(pdfBlob, fileName)) {
-          return { success: true, method: 'download' };
-        }
-        
-        // Try opening in new tab
-        if (tryOpenInNewTab(pdfBlob, fileName)) {
-          return { success: true, method: 'open' };
-        }
+      } catch (saveErr) {
+        console.error('pdf.save failed:', saveErr);
+      }
+      
+      // Try opening in new tab
+      if (tryOpenInNewTab(pdfBlob, fileName)) {
+        return { success: true, method: 'open' };
       }
     }
     
@@ -280,4 +292,5 @@ export async function simplePDFDownload(
     setIsDownloading(false);
   }
 }
+
 
