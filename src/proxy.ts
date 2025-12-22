@@ -4,7 +4,7 @@ import { verifyJWT } from '@/lib/jwt';
 
 const publicRoutes = ['/login', '/register'];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   
   // Allow nextjs internals and static files
@@ -22,12 +22,10 @@ export async function middleware(request: NextRequest) {
   
   let payload = null;
   if (token) {
-    // verifyJWT imports bcryptjs which might be an issue in edge, 
-    // but let's try. If it fails we split the file.
     try {
         payload = await verifyJWT(token);
-    } catch (e) {
-        console.error("Middleware JWT verify error:", e);
+    } catch {
+        console.error("Proxy JWT verify error");
     }
   }
 
