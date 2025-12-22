@@ -45,7 +45,7 @@ dream-record/
 │   │   ├── loading-context.tsx   # Loading state context for page transitions
 │   │   ├── pdf-download.ts       # Robust PDF download with multiple fallbacks
 │   │   └── prisma.ts             # Database client
-│   └── middleware.ts             # Route protection
+│   └── proxy.ts                  # Route protection (Next.js 16 proxy convention)
 ├── mobile/                       # Flutter Mobile Application
 │   ├── lib/
 │   │   ├── main.dart             # App entry point
